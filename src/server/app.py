@@ -316,10 +316,12 @@ async def _astream_workflow_generator(
     }
 
     # Handle MongoDB checkpointer if configured
-    mongodb = os.getenv("MONGODB_URI", "")
-    if mongodb:
+    
+    checkpoint_saver = os.getenv("LANGGRAPH_CHECKPOINT_SAVER", "false")
+    checkpoint_url = os.getenv("LANGGRAPH_CHECKPOINT_DB_URL", "")
+    if checkpoint_saver=="true" and checkpoint_url!="":
         logger.info("start async mongodb checkpointer.")
-        async with AsyncMongoDBSaver.from_conn_string(mongodb) as checkpointer:
+        async with AsyncMongoDBSaver.from_conn_string(checkpoint_url) as checkpointer:
             graph.checkpointer = checkpointer
             graph.store = in_memory_store
             async for event in _stream_graph_events(
