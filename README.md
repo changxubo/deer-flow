@@ -387,9 +387,11 @@ DeerFlow supports LangSmith tracing to help you debug and monitor your workflows
 This will enable trace visualization in LangGraph Studio and send your traces to LangSmith for monitoring and analysis.
 
 ### Checkpointing
-1. NoSQL implementation of LangGraph checkpoint saver.
+1. Postgres and MonogDB implementation of LangGraph checkpoint saver.
 2. Supports saving and loading checkpoints for workflow execution.
 3. Supports saving chat stream events for replaying conversations.
+
+Note: It was recommended to use MongoDB for checkpointing, as langgraph-checkpoint-postgres-2.0.3 have checkpointing issue for now, you can check the open issue:"TypeError: Object of type HumanMessage is not JSON serializable"  [https://github.com/langchain-ai/langgraph/issues/5557].
 
 The default database and collection will be automatically created if not exists.
 Default database: checkpoing_db
@@ -400,10 +402,11 @@ Default collection: chat_streams (chat stream events for replaying conversations
 You need to set the following environment variables in your `.env` file:
 
 ```bash
-# Enable LangGraph checkpoint saver
+# Enable LangGraph checkpoint saver, supports MongoDB, Postgres
 LANGGRAPH_CHECKPOINT_SAVER=true
 # Set the database URL for saving checkpoints
 LANGGRAPH_CHECKPOINT_DB_URL="mongodb://localhost:27017/"
+#LANGGRAPH_CHECKPOINT_DB_URL=postgresql://localhost:5432/postgres
 ```
 
 ## Docker

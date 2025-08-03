@@ -23,8 +23,9 @@ logger = logging.getLogger(__name__)
 if os.name == "nt":
     logger.info("Setting Windows event loop policy for asyncio")
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+#if sys.platform == "win32":
+#    logger.info("Setting Windows32 event loop policy for asyncio")
+#    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
     
 def handle_shutdown(signum, frame):
     """Handle graceful shutdown on SIGTERM/SIGINT"""

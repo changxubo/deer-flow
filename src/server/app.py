@@ -15,6 +15,8 @@ from langchain_core.messages import AIMessageChunk, BaseMessage, ToolMessage
 from langgraph.types import Command
 from langgraph.store.memory import InMemoryStore
 from langgraph.checkpoint.mongodb import AsyncMongoDBSaver
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from psycopg_pool import AsyncConnectionPool
 
 from src.config.configuration import get_recursion_limit
 from src.config.report_style import ReportStyle
@@ -315,19 +317,32 @@ async def _astream_workflow_generator(
         "recursion_limit": get_recursion_limit(),
     }
 
-    # Handle MongoDB checkpointer if configured
-    
     checkpoint_saver = os.getenv("LANGGRAPH_CHECKPOINT_SAVER", "false")
     checkpoint_url = os.getenv("LANGGRAPH_CHECKPOINT_DB_URL", "")
+    # Handle checkpointer if configured
+    connection_kwargs = {  "autocommit": True, "row_factory":"dict_row",  "prepare_threshold": 0, }
     if checkpoint_saver=="true" and checkpoint_url!="":
-        logger.info("start async mongodb checkpointer.")
-        async with AsyncMongoDBSaver.from_conn_string(checkpoint_url) as checkpointer:
-            graph.checkpointer = checkpointer
-            graph.store = in_memory_store
-            async for event in _stream_graph_events(
-                graph, workflow_input, workflow_config, thread_id
-            ):
-                yield event
+        if checkpoint_url.startswith("postgresql://"):
+            logger.info("start async postgres checkpointer.")
+            async with AsyncConnectionPool(checkpoint_url, kwargs=connection_kwargs) as conn: 
+                checkpointer = AsyncPostgresSaver(conn)
+                await checkpointer.setup()
+                graph.checkpointer = checkpointer
+                graph.store = in_memory_store
+                async for event in _stream_graph_events(
+                    graph, workflow_input, workflow_config, thread_id
+                ):
+                    yield event
+    
+        if checkpoint_url.startswith("mongodb://"):
+            logger.info("start async mongodb checkpointer.")
+            async with AsyncMongoDBSaver.from_conn_string(checkpoint_url) as checkpointer:
+                graph.checkpointer = checkpointer
+                graph.store = in_memory_store
+                async for event in _stream_graph_events(
+                    graph, workflow_input, workflow_config, thread_id
+                ):
+                    yield event
     else:
         # Use graph without MongoDB checkpointer
         async for event in _stream_graph_events(
