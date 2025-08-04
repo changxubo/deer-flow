@@ -5,7 +5,7 @@ import base64
 import json
 import logging
 import os
-from typing import Annotated, Any, List, cast
+from typing import Annotated, List, cast
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Query
@@ -276,11 +276,6 @@ async def _astream_workflow_generator(
     report_style: ReportStyle,
     enable_deep_thinking: bool,
 ):
-    # Validate input messages
-    if not messages:
-        yield _make_event("error", {"error": "No messages provided"})
-        return
-
     # Process initial messages
     for message in messages:
         if isinstance(message, dict) and "content" in message:
