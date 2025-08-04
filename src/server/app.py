@@ -357,14 +357,6 @@ async def _astream_workflow_generator(
 def _make_event(event_type: str, data: dict[str, any]):
     if data.get("content") == "":
         data.pop("content")
-    # skip empty data: content,reasoning_content,finish_reason
-    if event_type == "message_chunk":
-        if (
-            data.get("content", "") == ""
-            and data.get("reasoning_content", "") == ""
-            and data.get("finish_reason", "") == ""
-        ):
-            return ""
     # Ensure JSON serialization with proper encoding
     try:
         json_data = json.dumps(data, ensure_ascii=False)
