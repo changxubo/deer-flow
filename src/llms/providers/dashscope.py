@@ -70,7 +70,7 @@ def _convert_delta_to_message_chunk(
                 for rtc in raw_tool_calls
                 if rtc.get("function")  # Ensure function key exists
             ]
-        except (KeyError, TypeError) as e:
+        except (KeyError, TypeError):
             # Log the error but continue processing
             pass
 
