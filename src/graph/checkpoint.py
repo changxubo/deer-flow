@@ -50,7 +50,7 @@ class ChatStreamManager:
             "LANGGRAPH_CHECKPOINT_DB_URL", "mongodb://localhost:27017"
         )
 
-        if self._checkpoint_saver and self._db_url.startswith("mongodb://"):
+        if self.checkpoint_saver and self._db_url.startswith("mongodb://"):
             try:
                 self.mongo_client = MongoClient(self._db_uri)
                 self.mongo_db: Database = self.mongo_client.checkpointing_db
