@@ -320,11 +320,17 @@ async def _astream_workflow_generator(
     checkpoint_saver = os.getenv("LANGGRAPH_CHECKPOINT_SAVER", "false")
     checkpoint_url = os.getenv("LANGGRAPH_CHECKPOINT_DB_URL", "")
     # Handle checkpointer if configured
-    connection_kwargs = {  "autocommit": True, "row_factory":"dict_row",  "prepare_threshold": 0, }
-    if checkpoint_saver=="true" and checkpoint_url!="":
+    connection_kwargs = {
+        "autocommit": True,
+        "row_factory": "dict_row",
+        "prepare_threshold": 0,
+    }
+    if checkpoint_saver == "true" and checkpoint_url != "":
         if checkpoint_url.startswith("postgresql://"):
             logger.info("start async postgres checkpointer.")
-            async with AsyncConnectionPool(checkpoint_url, kwargs=connection_kwargs) as conn: 
+            async with AsyncConnectionPool(
+                checkpoint_url, kwargs=connection_kwargs
+            ) as conn:
                 checkpointer = AsyncPostgresSaver(conn)
                 await checkpointer.setup()
                 graph.checkpointer = checkpointer
@@ -333,10 +339,12 @@ async def _astream_workflow_generator(
                     graph, workflow_input, workflow_config, thread_id
                 ):
                     yield event
-    
+
         if checkpoint_url.startswith("mongodb://"):
             logger.info("start async mongodb checkpointer.")
-            async with AsyncMongoDBSaver.from_conn_string(checkpoint_url) as checkpointer:
+            async with AsyncMongoDBSaver.from_conn_string(
+                checkpoint_url
+            ) as checkpointer:
                 graph.checkpointer = checkpointer
                 graph.store = in_memory_store
                 async for event in _stream_graph_events(

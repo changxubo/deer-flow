@@ -8,6 +8,7 @@ import json_repair
 
 logger = logging.getLogger(__name__)
 
+
 def sanitize_args(args: Any) -> str:
     """
     Sanitize tool call arguments to prevent special character issues.
@@ -27,6 +28,8 @@ def sanitize_args(args: Any) -> str:
             .replace("{", "&#123;")
             .replace("}", "&#125;")
         )
+
+
 def repair_json_output(content: str) -> str:
     """
     Repair and normalize JSON output.
@@ -52,4 +55,3 @@ def repair_json_output(content: str) -> str:
         logger.warning(f"JSON repair failed: {e}")
 
     return content
-
