@@ -391,7 +391,10 @@ This will enable trace visualization in LangGraph Studio and send your traces to
 2. Supports saving and loading checkpoints for workflow execution.
 3. Supports saving chat stream events for replaying conversations.
 
-Note: It was recommended to use MongoDB for checkpointing, as langgraph-checkpoint-postgres-2.0.3 have checkpointing issue for now, you can check the open issue:"TypeError: Object of type HumanMessage is not JSON serializable"  [https://github.com/langchain-ai/langgraph/issues/5557].
+Note: 
+The latest langgraph-checkpoint-postgres-2.0.23 have checkpointing issue, you can check the open issue:"TypeError: Object of type HumanMessage is not JSON serializable"  [https://github.com/langchain-ai/langgraph/issues/5557].
+
+To use postgres checkpoint you should install langgraph-checkpoint-postgres-2.0.21
 
 The default database and collection will be automatically created if not exists.
 Default database: checkpoing_db
