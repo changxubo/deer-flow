@@ -23,7 +23,7 @@ from src.tools import (
 
 from src.config.agents import AGENT_LLM_MAP
 from src.config.configuration import Configuration
-from src.llms.llm import get_llm_by_type
+from src.llms.llm import get_llm_by_type, get_llm_by_thinking
 from src.prompts.planner_model import Plan
 from src.prompts.template import apply_prompt_template
 from src.utils.json_utils import repair_json_output
@@ -102,7 +102,7 @@ def planner_node(
         ]
 
     if configurable.enable_deep_thinking:
-        llm = get_llm_by_type("reasoning")
+        llm = get_llm_by_thinking("reasoning", enable_thinking=True)
     elif AGENT_LLM_MAP["planner"] == "basic":
         llm = get_llm_by_type("basic").with_structured_output(
             Plan,
@@ -458,16 +458,17 @@ async def _setup_and_execute_agent_step(
 
     # Create and execute agent with MCP tools if available
     if mcp_servers:
-        async with MultiServerMCPClient(mcp_servers) as client:
-            loaded_tools = default_tools[:]
-            for tool in client.get_tools():
-                if tool.name in enabled_tools:
-                    tool.description = (
-                        f"Powered by '{enabled_tools[tool.name]}'.\n{tool.description}"
-                    )
-                    loaded_tools.append(tool)
-            agent = create_agent(agent_type, agent_type, loaded_tools, agent_type)
-            return await _execute_agent_step(state, agent, agent_type)
+        client = MultiServerMCPClient(mcp_servers)
+        loaded_tools = default_tools[:]
+        all_tools = await client.get_tools()
+        for tool in all_tools:
+            if tool.name in enabled_tools:
+                tool.description = (
+                    f"Powered by '{enabled_tools[tool.name]}'.\n{tool.description}"
+                )
+                loaded_tools.append(tool)
+        agent = create_agent(agent_type, agent_type, loaded_tools, agent_type)
+        return await _execute_agent_step(state, agent, agent_type)
     else:
         # Use default tools if no MCP servers are configured
         agent = create_agent(agent_type, agent_type, default_tools, agent_type)
