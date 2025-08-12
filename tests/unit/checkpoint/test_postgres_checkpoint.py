@@ -4,56 +4,7 @@
 import sys
 import types
 from types import SimpleNamespace
-
 import pytest
-
-# Ensure optional DB clients are available for import in src.graph.checkpoint
-# even if not installed in the local test environment.
-
-if "psycopg" not in sys.modules:
-    # Create a minimal fake psycopg package with a rows submodule providing dict_row
-    psycopg_mod = types.ModuleType("psycopg")  # pragma: no cover
-    rows_mod = types.ModuleType("psycopg.rows")
-
-    def _fake_connect(*_a, **_k):
-        # Return a simple object to stand in as a connection if used directly in tests
-        class _Conn:
-            def cursor(self):
-                raise RuntimeError(
-                    "fake psycopg connection should not be used in tests"
-                )
-
-            def close(self):
-                pass
-
-        return _Conn()
-
-    psycopg_mod.connect = _fake_connect
-    rows_mod.dict_row = object()
-
-    sys.modules["psycopg"] = psycopg_mod
-    sys.modules["psycopg.rows"] = rows_mod
-
-# Also stub pymongo if missing to allow importing checkpoint module
-if "pymongo" not in sys.modules:
-
-    class _DummyMongoClient:  # pragma: no cover
-        def __init__(self, *_args, **_kwargs):
-            pass
-
-        class _Admin:
-            def command(self, *_a, **_k):
-                return {"ok": 1}
-
-        @property
-        def admin(self):
-            return self._Admin()
-
-        def close(self):
-            pass
-
-    sys.modules["pymongo"] = SimpleNamespace(MongoClient=_DummyMongoClient)
-
 from src.graph.checkpoint import ChatStreamManager
 
 

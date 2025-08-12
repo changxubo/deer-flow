@@ -3,31 +3,7 @@
 
 import sys
 from types import SimpleNamespace
-
 import pytest
-
-# Ensure optional DB clients are available for import in src.graph.checkpoint
-# even if not installed in the local test environment.
-
-if "pymongo" not in sys.modules:
-
-    class _DummyMongoClient:  # pragma: no cover
-        def __init__(self, *_args, **_kwargs):
-            pass
-
-        class _Admin:
-            def command(self, *_a, **_k):
-                return {"ok": 1}
-
-        @property
-        def admin(self):
-            return self._Admin()
-
-        def close(self):
-            pass
-
-    sys.modules["pymongo"] = SimpleNamespace(MongoClient=_DummyMongoClient)
-
 from src.graph.checkpoint import ChatStreamManager
 
 
