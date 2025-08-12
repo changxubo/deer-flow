@@ -429,7 +429,8 @@ Final, start up a docker container running the web server:
 
 ```bash
 # Replace deer-flow-api-app with your preferred container name
-docker run -d -t -p 8000:8000 --env-file .env --name deer-flow-api-app deer-flow-api
+# Start the server then bind to localhost:8000
+docker run -d -t -p 127.0.0.1:8000:8000 --env-file .env --name deer-flow-api-app deer-flow-api
 
 # stop the server
 docker stop deer-flow-api-app
@@ -446,6 +447,9 @@ docker compose build
 # start the server
 docker compose up
 ```
+
+> [!WARNING]
+> If you want to deploy the deer flow into production environments, please add authentication to the website and evaluate your security check of the MCPServer and Python Repl. 
 
 ## Examples
 
