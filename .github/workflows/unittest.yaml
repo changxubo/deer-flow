@@ -37,11 +37,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 3
-    env:
-      LANGGRAPH_CHECKPOINT_DB_URL: mongodb://admin:admin@localhost:27017/checkpointing_db?authSource=admin
-      LANGGRAPH_CHECKPOINT_SAVER: true
-      ENABLE_MCP_SERVER_CONFIGURATION: true
-    
     steps:
     - uses: actions/checkout@v3
 
