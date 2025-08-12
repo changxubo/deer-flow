@@ -2,16 +2,9 @@
 # SPDX-License-Identifier: MIT
 
 import src.graph.checkpoint as checkpoint
-from src.config.configuration import get_str_env
 
-POSTGRES_URL = get_str_env(
-    "LANGGRAPH_CHECKPOINT_DB_URL",
-    "postgresql://postgres:postgres@localhost:5432/checkpointing_db",
-)
-MONGO_URL = get_str_env(
-    "LANGGRAPH_CHECKPOINT_DB_URL",
-    "mongodb://admin:admin@localhost:27017/checkpointing_db?authSource=admin",
-)
+POSTGRES_URL = "postgresql://postgres:postgres@localhost:5432/checkpointing_db"
+MONGO_URL = "mongodb://admin:admin@localhost:27017/checkpointing_db?authSource=admin"
 
 
 class Dummy:

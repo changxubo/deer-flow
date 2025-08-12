@@ -13,6 +13,18 @@ jobs:
   test:
     runs-on: ubuntu-latest
     services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: checkpointing_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
       mongodb:
         image: mongo:6
         env:
@@ -27,59 +39,6 @@ jobs:
           --health-retries 3
     env:
       LANGGRAPH_CHECKPOINT_DB_URL: mongodb://admin:admin@localhost:27017/checkpointing_db?authSource=admin
-      LANGGRAPH_CHECKPOINT_SAVER: true
-    
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Install the latest version of uv
-      uses: astral-sh/setup-uv@v6.3.1
-      with:
-        version: "latest"
-
-    - name: Install dependencies
-      run: |
-        uv venv --python 3.12
-        uv pip install -e ".[dev]"
-        uv pip install -e ".[test]"
-
-    - name: Run test cases with coverage
-      run: |
-        source .venv/bin/activate
-        TAVILY_API_KEY=mock-key make coverage
-
-    - name: Generate HTML Coverage Report
-      run: |
-        source .venv/bin/activate
-        python -m coverage html -d coverage_html
-
-    - name: Upload Coverage Report
-      uses: actions/upload-artifact@v4
-      with:
-        name: coverage-report
-        path: coverage_html/
-        
-    - name: Display Coverage Summary
-      run: |
-        source .venv/bin/activate
-        python -m coverage report
-  test_pg:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_DB: checkpointing_db
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    env:
-      LANGGRAPH_CHECKPOINT_DB_URL: postgresql://postgres:postgres@localhost:5432/checkpointing_db
       LANGGRAPH_CHECKPOINT_SAVER: true
     
     steps:
