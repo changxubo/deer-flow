@@ -49,9 +49,7 @@ def _get_env_llm_conf(llm_type: str) -> Dict[str, Any]:
     return conf
 
 
-def _create_llm_use_conf(
-    llm_type: LLMType, conf: Dict[str, Any], enable_thinking: bool
-) -> BaseChatModel:
+def _create_llm_use_conf(llm_type: LLMType, conf: Dict[str, Any]) -> BaseChatModel:
     """Create LLM instance using configuration."""
     llm_type_config_keys = _get_llm_type_config_keys()
     config_key = llm_type_config_keys.get(llm_type)
@@ -91,8 +89,10 @@ def _create_llm_use_conf(
 
     if "azure_endpoint" in merged_conf or os.getenv("AZURE_OPENAI_ENDPOINT"):
         return AzureChatOpenAI(**merged_conf)
-    if "dashscope" in merged_conf:
-        if enable_thinking:
+
+    # Check if base_url is dashscope endpoint
+    if "base_url" in merged_conf and "dashscope." in merged_conf["base_url"]:
+        if llm_type == "reasoning":
             merged_conf["extra_body"] = {"enable_thinking": True}
         else:
             merged_conf["extra_body"] = {"enable_thinking": False}
@@ -103,22 +103,6 @@ def _create_llm_use_conf(
         return ChatOpenAI(**merged_conf)
 
 
-def get_llm_by_thinking(
-    llm_type: LLMType, enable_thinking: bool = False
-) -> BaseChatModel:
-    """
-    Get LLM instance by type with optional thinking capability.
-    Returns cached instance if available.
-    """
-    if llm_type in _llm_cache:
-        return _llm_cache[llm_type]
-
-    conf = load_yaml_config(_get_config_file_path())
-    llm = _create_llm_use_conf(llm_type, conf, enable_thinking)
-    _llm_cache[llm_type] = llm
-    return llm
-
-
 def get_llm_by_type(llm_type: LLMType) -> BaseChatModel:
     """
     Get LLM instance by type. Returns cached instance if available.
@@ -127,7 +111,7 @@ def get_llm_by_type(llm_type: LLMType) -> BaseChatModel:
         return _llm_cache[llm_type]
 
     conf = load_yaml_config(_get_config_file_path())
-    llm = _create_llm_use_conf(llm_type, conf, enable_thinking=False)
+    llm = _create_llm_use_conf(llm_type, conf)
     _llm_cache[llm_type] = llm
     return llm
 
