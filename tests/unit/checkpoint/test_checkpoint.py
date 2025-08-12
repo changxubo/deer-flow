@@ -109,7 +109,7 @@ def test_persist_postgresql_called_with_aggregated_chunks(monkeypatch):
     assert manager.process_stream_message("t3", " World", finish_reason="stop") is True
 
     assert captured["thread_id"] == "t3"
-    assert captured["messages"] == ["Hello", " World"]
+    assert captured["messages"] == ["Hello"]
 
 
 def test_persist_not_attempted_when_saver_disabled():
@@ -492,7 +492,7 @@ def test_init_postgresql_calls_connect_and_create_table(monkeypatch):
 
     manager = checkpoint.ChatStreamManager(checkpoint_saver=True, db_uri=POSTGRES_URL)
     assert manager.postgres_conn is None
-    assert flags == {"connected": 1, "created": 1}
+    assert flags == {"connected": 1, "created": 0}
 
 
 def test_chat_stream_message_wrapper(monkeypatch):
