@@ -18,7 +18,7 @@ from langgraph.checkpoint.mongodb import AsyncMongoDBSaver
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg_pool import AsyncConnectionPool
 
-from src.config.configuration import get_recursion_limit
+from src.config.configuration import get_recursion_limit, get_bool_env, get_str_env
 from src.config.report_style import ReportStyle
 from src.config.tools import SELECTED_RAG_PROVIDER
 from src.graph.builder import build_graph_with_memory
@@ -62,7 +62,7 @@ app = FastAPI(
 # Add CORS middleware
 # It's recommended to load the allowed origins from an environment variable
 # for better security and flexibility across different environments.
-allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
+allowed_origins_str = get_str_env("ALLOWED_ORIGINS", "http://localhost:3000")
 allowed_origins = [origin.strip() for origin in allowed_origins_str.split(",")]
 
 logger.info(f"Allowed origins: {allowed_origins}")
@@ -81,11 +81,7 @@ graph = build_graph_with_memory()
 @app.post("/api/chat/stream")
 async def chat_stream(request: ChatRequest):
     # Check if MCP server configuration is enabled
-    mcp_enabled = os.getenv("ENABLE_MCP_SERVER_CONFIGURATION", "false").lower() in [
-        "true",
-        "1",
-        "yes",
-    ]
+    mcp_enabled = get_bool_env("ENABLE_MCP_SERVER_CONFIGURATION", False)
 
     # Validate MCP settings if provided
     if request.mcp_settings and not mcp_enabled:
@@ -312,15 +308,15 @@ async def _astream_workflow_generator(
         "recursion_limit": get_recursion_limit(),
     }
 
-    checkpoint_saver = os.getenv("LANGGRAPH_CHECKPOINT_SAVER", "false")
-    checkpoint_url = os.getenv("LANGGRAPH_CHECKPOINT_DB_URL", "")
+    checkpoint_saver = get_bool_env("LANGGRAPH_CHECKPOINT_SAVER", False)
+    checkpoint_url = get_str_env("LANGGRAPH_CHECKPOINT_DB_URL", "")
     # Handle checkpointer if configured
     connection_kwargs = {
         "autocommit": True,
         "row_factory": "dict_row",
         "prepare_threshold": 0,
     }
-    if checkpoint_saver == "true" and checkpoint_url != "":
+    if checkpoint_saver and checkpoint_url != "":
         if checkpoint_url.startswith("postgresql://"):
             logger.info("start async postgres checkpointer.")
             async with AsyncConnectionPool(
@@ -379,18 +375,18 @@ def _make_event(event_type: str, data: dict[str, any]):
 @app.post("/api/tts")
 async def text_to_speech(request: TTSRequest):
     """Convert text to speech using volcengine TTS API."""
-    app_id = os.getenv("VOLCENGINE_TTS_APPID", "")
+    app_id = get_str_env("VOLCENGINE_TTS_APPID", "")
     if not app_id:
         raise HTTPException(status_code=400, detail="VOLCENGINE_TTS_APPID is not set")
-    access_token = os.getenv("VOLCENGINE_TTS_ACCESS_TOKEN", "")
+    access_token = get_str_env("VOLCENGINE_TTS_ACCESS_TOKEN", "")
     if not access_token:
         raise HTTPException(
             status_code=400, detail="VOLCENGINE_TTS_ACCESS_TOKEN is not set"
         )
 
     try:
-        cluster = os.getenv("VOLCENGINE_TTS_CLUSTER", "volcano_tts")
-        voice_type = os.getenv("VOLCENGINE_TTS_VOICE_TYPE", "BV700_V2_streaming")
+        cluster = get_str_env("VOLCENGINE_TTS_CLUSTER", "volcano_tts")
+        voice_type = get_str_env("VOLCENGINE_TTS_VOICE_TYPE", "BV700_V2_streaming")
 
         tts_client = VolcengineTTS(
             appid=app_id,
@@ -533,11 +529,7 @@ async def enhance_prompt(request: EnhancePromptRequest):
 async def mcp_server_metadata(request: MCPServerMetadataRequest):
     """Get information about an MCP server."""
     # Check if MCP server configuration is enabled
-    if os.getenv("ENABLE_MCP_SERVER_CONFIGURATION", "false").lower() not in [
-        "true",
-        "1",
-        "yes",
-    ]:
+    if get_bool_env("ENABLE_MCP_SERVER_CONFIGURATION", False):
         raise HTTPException(
             status_code=403,
             detail="MCP server configuration is disabled. Set ENABLE_MCP_SERVER_CONFIGURATION=true to enable MCP features.",

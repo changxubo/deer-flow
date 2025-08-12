@@ -388,8 +388,9 @@ This will enable trace visualization in LangGraph Studio and send your traces to
 
 ### Checkpointing
 1. Postgres and MonogDB implementation of LangGraph checkpoint saver.
-2. Supports saving and loading checkpoints for workflow execution.
-3. Supports saving chat stream events for replaying conversations.
+2. In-memory store is used to caching the streaming messages before persisting to database, If finish_reason is "stop" or "interrupt", it triggers persistence.
+3. Supports saving and loading checkpoints for workflow execution.
+4. Supports saving chat stream events for replaying conversations.
 
 Note: 
 The latest langgraph-checkpoint-postgres-2.0.23 have checkpointing issue, you can check the open issue:"TypeError: Object of type HumanMessage is not JSON serializable"  [https://github.com/langchain-ai/langgraph/issues/5557].

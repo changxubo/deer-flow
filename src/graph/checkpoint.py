@@ -11,6 +11,7 @@ import psycopg
 from psycopg.rows import dict_row
 from pymongo import MongoClient
 from langgraph.store.memory import InMemoryStore
+from src.config.configuration import get_bool_env, get_str_env
 
 
 class ChatStreamManager:
@@ -41,14 +42,9 @@ class ChatStreamManager:
         """
         self.logger = logging.getLogger(__name__)
         self.store = InMemoryStore()
-        self.checkpoint_saver = (
-            checkpoint_saver
-            or os.getenv("LANGGRAPH_CHECKPOINT_SAVER", "false").lower() == "true"
-        )
+        self.checkpoint_saver = checkpoint_saver
         # Use provided URI or fall back to environment variable or default
-        self.db_uri = db_uri or os.getenv(
-            "LANGGRAPH_CHECKPOINT_DB_URL", "mongodb://localhost:27017"
-        )
+        self.db_uri = db_uri
 
         # Initialize database connections
         self.mongo_client = None
@@ -348,7 +344,10 @@ class ChatStreamManager:
 
 # Global instance for backward compatibility
 # TODO: Consider using dependency injection instead of global instance
-_default_manager = ChatStreamManager()
+_default_manager = ChatStreamManager(
+    checkpoint_saver=get_bool_env("LANGGRAPH_CHECKPOINT_SAVER", False),
+    db_uri=get_str_env("LANGGRAPH_CHECKPOINT_DB_URL", "mongodb://localhost:27017"),
+)
 
 
 def chat_stream_message(thread_id: str, message: str, finish_reason: str) -> bool:
@@ -363,9 +362,7 @@ def chat_stream_message(thread_id: str, message: str, finish_reason: str) -> boo
     Returns:
         bool: True if message was processed successfully
     """
-    checkpoint_saver = (
-        os.getenv("LANGGRAPH_CHECKPOINT_SAVER", "false").lower() == "true"
-    )
+    checkpoint_saver = get_bool_env("LANGGRAPH_CHECKPOINT_SAVER", False)
     if checkpoint_saver:
         return _default_manager.process_stream_message(
             thread_id, message, finish_reason
