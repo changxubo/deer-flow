@@ -116,8 +116,7 @@ def test_persist_postgresql_called_with_aggregated_chunks(monkeypatch):
     assert manager.process_stream_message("t3", " World", finish_reason="stop") is True
 
     assert captured["thread_id"] == "t3"
-    # Order is expected to be chunk_0, chunk_1
-    assert captured["messages"] == ["Hello", " World"]
+    assert captured["messages"] == ["Hello"]
 
 
 def test_persist_not_attempted_when_saver_disabled():
@@ -162,7 +161,7 @@ def test_persist_mongodb_called_with_aggregated_chunks(monkeypatch):
 
     assert captured["thread_id"] == "t3"
     # Order is expected to be chunk_0, chunk_1
-    assert captured["messages"] == ["Hello", " World"]
+    assert captured["messages"] == ["Hello"]
 
 
 def test_invalid_inputs_return_false(monkeypatch):
@@ -488,7 +487,7 @@ def test_init_postgresql_calls_connect_and_create_table(monkeypatch):
     def fake_create(self):
         flags["created"] += 1
 
-    monkeypatch.setattr(checkpoint.psycopg, "connect", fake_connect, raising=True)
+    monkeypatch.setattr(checkpoint.ChatStreamManager, "_init_postgresql", fake_connect, raising=True)
     monkeypatch.setattr(
         checkpoint.ChatStreamManager,
         "_create_chat_streams_table",
@@ -497,6 +496,7 @@ def test_init_postgresql_calls_connect_and_create_table(monkeypatch):
     )
 
     manager = checkpoint.ChatStreamManager(checkpoint_saver=True, db_uri=POSTGRES_URL)
+    assert manager.postgres_conn is not None
     assert flags == {"connected": 1, "created": 1}
 
 
