@@ -528,7 +528,7 @@ async def enhance_prompt(request: EnhancePromptRequest):
 async def mcp_server_metadata(request: MCPServerMetadataRequest):
     """Get information about an MCP server."""
     # Check if MCP server configuration is enabled
-    if get_bool_env("ENABLE_MCP_SERVER_CONFIGURATION", False):
+    if not get_bool_env("ENABLE_MCP_SERVER_CONFIGURATION", False):
         raise HTTPException(
             status_code=403,
             detail="MCP server configuration is disabled. Set ENABLE_MCP_SERVER_CONFIGURATION=true to enable MCP features.",
