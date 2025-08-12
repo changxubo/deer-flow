@@ -487,7 +487,9 @@ def test_init_postgresql_calls_connect_and_create_table(monkeypatch):
     def fake_create(self):
         flags["created"] += 1
 
-    monkeypatch.setattr(checkpoint.ChatStreamManager, "_init_postgresql", fake_connect, raising=True)
+    monkeypatch.setattr(
+        checkpoint.ChatStreamManager, "_init_postgresql", fake_connect, raising=True
+    )
     monkeypatch.setattr(
         checkpoint.ChatStreamManager,
         "_create_chat_streams_table",
