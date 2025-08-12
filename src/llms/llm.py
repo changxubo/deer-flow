@@ -74,9 +74,6 @@ def _create_llm_use_conf(llm_type: LLMType, conf: Dict[str, Any]) -> BaseChatMod
     if "max_retries" not in merged_conf:
         merged_conf["max_retries"] = 3
 
-    if llm_type == "reasoning":
-        merged_conf["api_base"] = merged_conf.pop("base_url", None)
-
     # Handle SSL verification settings
     verify_ssl = merged_conf.pop("verify_ssl", True)
 
@@ -97,7 +94,9 @@ def _create_llm_use_conf(llm_type: LLMType, conf: Dict[str, Any]) -> BaseChatMod
         else:
             merged_conf["extra_body"] = {"enable_thinking": False}
         return ChatDashscope(**merged_conf)
+
     if llm_type == "reasoning":
+        merged_conf["api_base"] = merged_conf.pop("base_url", None)
         return ChatDeepSeek(**merged_conf)
     else:
         return ChatOpenAI(**merged_conf)
