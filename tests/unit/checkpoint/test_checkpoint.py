@@ -12,6 +12,23 @@ class Dummy:
 
     pass
 
+def test_with_local_postgres_db():
+    """Ensure the ChatStreamManager can be initialized with a local PostgreSQL DB."""
+    manager = checkpoint.ChatStreamManager(
+        checkpoint_saver=True,
+        db_uri=POSTGRES_URL,
+    )
+    assert manager.postgres_conn is not None
+    assert manager.mongo_client is None
+    
+def test_with_local_mongo_db():
+    """Ensure the ChatStreamManager can be initialized with a local MongoDB."""
+    manager = checkpoint.ChatStreamManager(
+        checkpoint_saver=True,
+        db_uri=MONGO_URL,
+    )
+    assert manager.mongo_db is not None
+    assert manager.postgres_conn is None
 
 def test_init_without_checkpoint_saver():
     """Manager should not create DB clients when checkpoint_saver is False."""
@@ -21,32 +38,26 @@ def test_init_without_checkpoint_saver():
     assert manager.mongo_client is None
     assert manager.postgres_conn is None
 
-
-def test_process_stream_partial_returns_true_and_stores_chunk_postgres(monkeypatch):
+def test_process_stream_partial_buffer_postgres(monkeypatch):
     """Partial chunks should be buffered; Postgres init is stubbed to no-op."""
-
     # Patch Postgres init to no-op
     def _no_pg(self):
         self.postgres_conn = None
-
     monkeypatch.setattr(
         checkpoint.ChatStreamManager, "_init_postgresql", _no_pg, raising=True
     )
-
     manager = checkpoint.ChatStreamManager(
         checkpoint_saver=True,
         db_uri=POSTGRES_URL,
     )
     result = manager.process_stream_message("t1", "hello", finish_reason="partial")
     assert result is True
-
     # Verify the chunk was stored in the in-memory store
     items = manager.store.search(("messages", "t1"), limit=10)
     values = [it.dict()["value"] for it in items]
     assert "hello" in values
 
-
-def test_process_stream_partial_returns_true_and_stores_chunk_mongo(monkeypatch):
+def test_process_stream_partial_buffer_mongo(monkeypatch):
     """Partial chunks should be buffered; Mongo init is stubbed to no-op."""
 
     # Patch Mongo init to no-op for speed
@@ -72,12 +83,10 @@ def test_process_stream_partial_returns_true_and_stores_chunk_mongo(monkeypatch)
 
 def test_persist_postgresql_called_with_aggregated_chunks(monkeypatch):
     """On 'stop', aggregated chunks should be passed to PostgreSQL persist method."""
-
     # Avoid real connection by making postgres_conn truthy so PostgreSQL branch is used
     def _fake_pg(self):
         class _DummyConn:
             pass
-
         self.postgres_conn = _DummyConn()
 
     monkeypatch.setattr(
@@ -88,9 +97,8 @@ def test_persist_postgresql_called_with_aggregated_chunks(monkeypatch):
         checkpoint_saver=True,
         db_uri=POSTGRES_URL,
     )
-
+    
     captured = {}
-
     def fake_persist(self, thread_id, messages):  # signature must match
         captured["thread_id"] = thread_id
         captured["messages"] = list(messages)
@@ -103,13 +111,11 @@ def test_persist_postgresql_called_with_aggregated_chunks(monkeypatch):
         raising=True,
     )
 
-    assert (
-        manager.process_stream_message("t3", "Hello", finish_reason="partial") is True
-    )
+    assert manager.process_stream_message("t3", "Hello", finish_reason="partial") is True
     assert manager.process_stream_message("t3", " World", finish_reason="stop") is True
 
     assert captured["thread_id"] == "t3"
-    assert captured["messages"] == ["Hello"]
+    assert captured["messages"] == ["Hello"," World"]
 
 
 def test_persist_not_attempted_when_saver_disabled():
