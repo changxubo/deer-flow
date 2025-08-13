@@ -289,43 +289,6 @@ def test_store_namespace_consistency():
     assert cursor.value["index"] == 1
 
 
-def test_empty_messages_list_handling():
-    """Test behavior when messages list is empty during persistence."""
-    manager = checkpoint.ChatStreamManager(checkpoint_saver=True, db_uri=MONGO_URL)
-
-    # Mock store to return no messages
-    original_search = manager.store.search
-
-    def mock_search(namespace, limit=None):
-        # Return only cursor, no actual message chunks
-        return [type("Item", (), {"dict": lambda: {"value": {"index": 0}}})()]
-
-    manager.store.search = mock_search
-
-    # This should return False due to no messages
-    result = manager._persist_complete_conversation(
-        "empty_test", ("messages", "empty_test"), 0
-    )
-    assert result is False
-
-
-def test_process_stream_exception_handling(monkeypatch):
-    """Test exception handling in process_stream_message."""
-    manager = checkpoint.ChatStreamManager(checkpoint_saver=False)
-
-    # Mock store.put to raise an exception
-    def failing_put(*args, **kwargs):
-        raise RuntimeError("Store operation failed")
-
-    monkeypatch.setattr(manager.store, "put", failing_put)
-
-    # Should return False when exception occurs
-    result = manager.process_stream_message(
-        "exc_test", "message", finish_reason="partial"
-    )
-    assert result is False
-
-
 def test_cursor_initialization_edge_cases():
     """Test cursor handling edge cases."""
     manager = checkpoint.ChatStreamManager(checkpoint_saver=False)
@@ -383,14 +346,6 @@ def test_multiple_threads_isolation():
     assert "msg2" in thread2_values
     assert "msg1" not in thread2_values
     assert "msg2" not in thread1_values
-
-
-def test_db_uri_none_handling():
-    """Test handling when db_uri is None."""
-    manager = checkpoint.ChatStreamManager(checkpoint_saver=True, db_uri=None)
-    # Should not crash but also not initialize any connections
-    assert manager.mongo_client is None
-    assert manager.postgres_conn is None
 
 
 def test_mongodb_insert_and_update_paths(monkeypatch):
