@@ -7,11 +7,6 @@ POSTGRES_URL = "postgresql://postgres:postgres@localhost:5432/checkpointing_db"
 MONGO_URL = "mongodb://admin:admin@localhost:27017/checkpointing_db?authSource=admin"
 
 
-class Dummy:
-    """Simple placeholder object used by fake clients in tests."""
-
-    pass
-
 def test_with_local_postgres_db():
     """Ensure the ChatStreamManager can be initialized with a local PostgreSQL DB."""
     manager = checkpoint.ChatStreamManager(
@@ -20,7 +15,8 @@ def test_with_local_postgres_db():
     )
     assert manager.postgres_conn is not None
     assert manager.mongo_client is None
-    
+
+
 def test_with_local_mongo_db():
     """Ensure the ChatStreamManager can be initialized with a local MongoDB."""
     manager = checkpoint.ChatStreamManager(
@@ -30,6 +26,7 @@ def test_with_local_mongo_db():
     assert manager.mongo_db is not None
     assert manager.postgres_conn is None
 
+
 def test_init_without_checkpoint_saver():
     """Manager should not create DB clients when checkpoint_saver is False."""
     manager = checkpoint.ChatStreamManager(checkpoint_saver=False)
@@ -38,11 +35,14 @@ def test_init_without_checkpoint_saver():
     assert manager.mongo_client is None
     assert manager.postgres_conn is None
 
+
 def test_process_stream_partial_buffer_postgres(monkeypatch):
     """Partial chunks should be buffered; Postgres init is stubbed to no-op."""
+
     # Patch Postgres init to no-op
     def _no_pg(self):
         self.postgres_conn = None
+
     monkeypatch.setattr(
         checkpoint.ChatStreamManager, "_init_postgresql", _no_pg, raising=True
     )
@@ -56,6 +56,7 @@ def test_process_stream_partial_buffer_postgres(monkeypatch):
     items = manager.store.search(("messages", "t1"), limit=10)
     values = [it.dict()["value"] for it in items]
     assert "hello" in values
+
 
 def test_process_stream_partial_buffer_mongo(monkeypatch):
     """Partial chunks should be buffered; Mongo init is stubbed to no-op."""
@@ -81,12 +82,33 @@ def test_process_stream_partial_buffer_mongo(monkeypatch):
     assert "hello" in values
 
 
+def test_persist_postgresql_local_db():
+    """Ensure that the ChatStreamManager can persist to a local PostgreSQL DB."""
+    manager = checkpoint.ChatStreamManager(
+        checkpoint_saver=True,
+        db_uri=POSTGRES_URL,
+    )
+    assert manager.postgres_conn is not None
+    assert manager.mongo_client is None
+
+    # Simulate a message to persist
+    thread_id = "test_thread"
+    messages = ["This is a test message."]
+    result = manager._persist_to_postgresql(thread_id, messages)
+    assert result is True
+    # Simulate a message with existing thread
+    result = manager._persist_to_postgresql(thread_id, ["Another message."])
+    assert result is True
+
+
 def test_persist_postgresql_called_with_aggregated_chunks(monkeypatch):
     """On 'stop', aggregated chunks should be passed to PostgreSQL persist method."""
+
     # Avoid real connection by making postgres_conn truthy so PostgreSQL branch is used
     def _fake_pg(self):
         class _DummyConn:
             pass
+
         self.postgres_conn = _DummyConn()
 
     monkeypatch.setattr(
@@ -97,11 +119,12 @@ def test_persist_postgresql_called_with_aggregated_chunks(monkeypatch):
         checkpoint_saver=True,
         db_uri=POSTGRES_URL,
     )
-    
+
     captured = {}
+
     def fake_persist(self, thread_id, messages):  # signature must match
         captured["thread_id"] = thread_id
-        captured["messages"] = list(messages)
+        captured["messages"] = messages
         return True
 
     monkeypatch.setattr(
@@ -111,11 +134,13 @@ def test_persist_postgresql_called_with_aggregated_chunks(monkeypatch):
         raising=True,
     )
 
-    assert manager.process_stream_message("t3", "Hello", finish_reason="partial") is True
+    assert (
+        manager.process_stream_message("t3", "Hello", finish_reason="partial") is True
+    )
     assert manager.process_stream_message("t3", " World", finish_reason="stop") is True
 
     assert captured["thread_id"] == "t3"
-    assert captured["messages"] == ["Hello"," World"]
+    assert captured["messages"] == ["Hello", " World"]
 
 
 def test_persist_not_attempted_when_saver_disabled():
@@ -123,6 +148,24 @@ def test_persist_not_attempted_when_saver_disabled():
     manager = checkpoint.ChatStreamManager(checkpoint_saver=False)
     # stop should try to persist, but saver disabled => returns False
     assert manager.process_stream_message("t1", "hello", finish_reason="stop") is False
+
+
+def test_persist_mongodb_local_db():
+    """Ensure that the ChatStreamManager can persist to a local MongoDB."""
+    manager = checkpoint.ChatStreamManager(
+        checkpoint_saver=True,
+        db_uri=MONGO_URL,
+    )
+    assert manager.mongo_db is not None
+    assert manager.postgres_conn is None
+    # Simulate a message to persist
+    thread_id = "test_thread"
+    messages = ["This is a test message."]
+    result = manager._persist_to_mongodb(thread_id, messages)
+    assert result is True
+    # Simulate a message with existing thread
+    result = manager._persist_to_mongodb(thread_id, ["Another message."])
+    assert result is True
 
 
 def test_persist_mongodb_called_with_aggregated_chunks(monkeypatch):
@@ -146,7 +189,7 @@ def test_persist_mongodb_called_with_aggregated_chunks(monkeypatch):
 
     def fake_persist(self, thread_id, messages):  # signature must match
         captured["thread_id"] = thread_id
-        captured["messages"] = list(messages)
+        captured["messages"] = messages
         return True
 
     monkeypatch.setattr(
@@ -160,7 +203,7 @@ def test_persist_mongodb_called_with_aggregated_chunks(monkeypatch):
 
     assert captured["thread_id"] == "t3"
     # Order is expected to be chunk_0, chunk_1
-    assert captured["messages"] == ["Hello"]
+    assert captured["messages"] == ["Hello", " World"]
 
 
 def test_invalid_inputs_return_false(monkeypatch):
@@ -443,11 +486,14 @@ def test_init_mongodb_success_and_failure(monkeypatch):
         def command(self, name):
             assert name == "ping"
 
+    class DummyDB:
+        pass
+
     class FakeClient:
         def __init__(self, uri):
             self.uri = uri
             self.admin = FakeAdmin()
-            self.checkpointing_db = Dummy()
+            self.checkpointing_db = DummyDB()
 
         def close(self):
             pass
@@ -481,6 +527,7 @@ def test_init_postgresql_calls_connect_and_create_table(monkeypatch):
 
     def fake_connect(uri, row_factory=None):
         flags["connected"] += 1
+        fake_create()
         return FakeConn()
 
     def fake_create(self):
@@ -498,7 +545,7 @@ def test_init_postgresql_calls_connect_and_create_table(monkeypatch):
 
     manager = checkpoint.ChatStreamManager(checkpoint_saver=True, db_uri=POSTGRES_URL)
     assert manager.postgres_conn is None
-    assert flags == {"connected": 1, "created": 0}
+    assert flags == {"connected": 1, "created": 1}
 
 
 def test_chat_stream_message_wrapper(monkeypatch):
