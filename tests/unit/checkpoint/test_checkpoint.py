@@ -74,10 +74,10 @@ def test_process_stream_partial_buffer_mongo(monkeypatch):
         checkpoint_saver=True,
         db_uri=MONGO_URL,
     )
-    result = manager.process_stream_message("t1", "hello", finish_reason="partial")
+    result = manager.process_stream_message("t2", "hello", finish_reason="partial")
     assert result is True
     # Verify the chunk was stored in the in-memory store
-    items = manager.store.search(("messages", "t1"), limit=10)
+    items = manager.store.search(("messages", "t2"), limit=10)
     values = [it.dict()["value"] for it in items]
     assert "hello" in values
 
@@ -135,11 +135,13 @@ def test_persist_postgresql_called_with_aggregated_chunks(monkeypatch):
     )
 
     assert (
-        manager.process_stream_message("t3", "Hello", finish_reason="partial") is True
+        manager.process_stream_message("thd3", "Hello", finish_reason="partial") is True
     )
-    assert manager.process_stream_message("t3", " World", finish_reason="stop") is True
+    assert (
+        manager.process_stream_message("thd3", " World", finish_reason="stop") is True
+    )
 
-    assert captured["thread_id"] == "t3"
+    assert captured["thread_id"] == "thd3"
     assert captured["messages"] == ["Hello", " World"]
 
 
@@ -147,7 +149,7 @@ def test_persist_not_attempted_when_saver_disabled():
     """When saver disabled, stop should not persist and should return False."""
     manager = checkpoint.ChatStreamManager(checkpoint_saver=False)
     # stop should try to persist, but saver disabled => returns False
-    assert manager.process_stream_message("t1", "hello", finish_reason="stop") is False
+    assert manager.process_stream_message("t4", "hello", finish_reason="stop") is False
 
 
 def test_persist_mongodb_local_db():
@@ -197,11 +199,13 @@ def test_persist_mongodb_called_with_aggregated_chunks(monkeypatch):
     )
 
     assert (
-        manager.process_stream_message("t3", "Hello", finish_reason="partial") is True
+        manager.process_stream_message("thd5", "Hello", finish_reason="partial") is True
     )
-    assert manager.process_stream_message("t3", " World", finish_reason="stop") is True
+    assert (
+        manager.process_stream_message("thd5", " World", finish_reason="stop") is True
+    )
 
-    assert captured["thread_id"] == "t3"
+    assert captured["thread_id"] == "thd5"
     # Order is expected to be chunk_0, chunk_1
     assert captured["messages"] == ["Hello", " World"]
 
@@ -243,9 +247,9 @@ def test_no_db_connection_available_returns_false(monkeypatch):
         db_uri=MONGO_URL,
     )
     # partial stores chunk
-    assert manager.process_stream_message("t2", "hi", finish_reason="partial") is True
+    assert manager.process_stream_message("t6", "hi", finish_reason="partial") is True
     # stop tries to persist, but no db connection => False
-    assert manager.process_stream_message("t2", "!", finish_reason="stop") is False
+    assert manager.process_stream_message("t6", "!", finish_reason="stop") is False
 
 
 def test_persist_complete_no_messages_returns_false():
@@ -525,7 +529,7 @@ def test_init_postgresql_calls_connect_and_create_table(monkeypatch):
         def close(self):
             pass
 
-    def fake_connect(uri, row_factory=None):
+    def fake_connect(self):
         flags["connected"] += 1
         fake_create()
         return FakeConn()
