@@ -188,7 +188,8 @@ class ChatStreamManager:
         """
         try:
             # Retrieve all message chunks from memory store
-            memories = self.store.search(store_namespace, limit=final_index + 1)
+            # Get all messages up to the final index including cursor metadata
+            memories = self.store.search(store_namespace, limit=final_index + 2)
 
             # Extract message content, filtering out cursor metadata
             messages: List[str] = []

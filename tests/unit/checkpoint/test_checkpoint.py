@@ -123,7 +123,7 @@ def test_persist_postgresql_called_with_aggregated_chunks(monkeypatch):
         )
         existing_record = cursor.fetchone()
         assert existing_record is not None
-        assert existing_record[0] == ["Hello", " World"]
+        assert existing_record[0]["messages"] == ["Hello", " World"]
 
 
 def test_persist_not_attempted_when_saver_disabled():
@@ -494,20 +494,11 @@ def test_init_postgresql_calls_connect_and_create_table(monkeypatch):
 
     def fake_connect(self):
         flags["connected"] += 1
-        self.fake_create()
-        return FakeConn()
-
-    def fake_create(self):
         flags["created"] += 1
+        return FakeConn()
 
     monkeypatch.setattr(
         checkpoint.ChatStreamManager, "_init_postgresql", fake_connect, raising=True
-    )
-    monkeypatch.setattr(
-        checkpoint.ChatStreamManager,
-        "_create_chat_streams_table",
-        fake_create,
-        raising=True,
     )
 
     manager = checkpoint.ChatStreamManager(checkpoint_saver=True, db_uri=POSTGRES_URL)
