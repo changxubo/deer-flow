@@ -128,11 +128,14 @@ def _process_tool_call_chunks(tool_call_chunks):
     return chunks
 
 
-def _get_agent_name(agent):
+def _get_agent_name(agent, message_metadata):
     """Extract agent name from agent tuple."""
+    agent_name = "unknown"
     if agent and len(agent) > 0:
-        return agent[0].split(":")[0] if ":" in agent[0] else agent[0]
-    return "planner"
+        agent_name = agent[0].split(":")[0] if ":" in agent[0] else agent[0]
+    else:
+        agent_name = message_metadata.get("langgraph_node", "unknown")
+    return agent_name
 
 
 def _create_event_stream_message(
@@ -202,7 +205,7 @@ def _process_initial_messages(message, thread_id):
 
 async def _process_message_chunk(message_chunk, message_metadata, thread_id, agent):
     """Process a single message chunk and yield appropriate events."""
-    agent_name = _get_agent_name(agent)
+    agent_name = _get_agent_name(agent, message_metadata)
     event_stream_message = _create_event_stream_message(
         message_chunk, message_metadata, thread_id, agent_name
     )

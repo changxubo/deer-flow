@@ -207,9 +207,9 @@ class ChatStreamManager:
                 return False
 
             # Choose persistence method based on available connection
-            if self.mongo_db:
+            if self.mongo_db is not None:
                 return self._persist_to_mongodb(thread_id, messages)
-            elif self.postgres_conn:
+            elif self.postgres_conn is not None:
                 return self._persist_to_postgresql(thread_id, messages)
             else:
                 self.logger.warning("No database connection available")
@@ -319,14 +319,14 @@ class ChatStreamManager:
     def close(self) -> None:
         """Close database connections."""
         try:
-            if self.mongo_client:
+            if self.mongo_client is not None:
                 self.mongo_client.close()
                 self.logger.info("MongoDB connection closed")
         except Exception as e:
             self.logger.error(f"Error closing MongoDB connection: {e}")
 
         try:
-            if self.postgres_conn:
+            if self.postgres_conn is not None:
                 self.postgres_conn.close()
                 self.logger.info("PostgreSQL connection closed")
         except Exception as e:
