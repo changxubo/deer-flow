@@ -103,35 +103,9 @@ def test_persist_postgresql_local_db():
 
 def test_persist_postgresql_called_with_aggregated_chunks(monkeypatch):
     """On 'stop', aggregated chunks should be passed to PostgreSQL persist method."""
-
-    # Avoid real connection by making postgres_conn truthy so PostgreSQL branch is used
-    def _fake_pg(self):
-        class _DummyConn:
-            pass
-
-        self.postgres_conn = _DummyConn()
-
-    monkeypatch.setattr(
-        checkpoint.ChatStreamManager, "_init_postgresql", _fake_pg, raising=True
-    )
-
     manager = checkpoint.ChatStreamManager(
         checkpoint_saver=True,
         db_uri=POSTGRES_URL,
-    )
-
-    captured = {}
-
-    def fake_persist(self, thread_id, messages):  # signature must match
-        captured["thread_id"] = thread_id
-        captured["messages"] = messages
-        return True
-
-    monkeypatch.setattr(
-        checkpoint.ChatStreamManager,
-        "_persist_to_postgresql",
-        fake_persist,
-        raising=True,
     )
 
     assert (
@@ -141,8 +115,15 @@ def test_persist_postgresql_called_with_aggregated_chunks(monkeypatch):
         manager.process_stream_message("thd3", " World", finish_reason="stop") is True
     )
 
-    assert captured["thread_id"] == "thd3"
-    assert captured["messages"] == ["Hello", " World"]
+    # Verify the messages were aggregated correctly
+    with manager.postgres_conn.cursor() as cursor:
+        # Check if conversation already exists
+        cursor.execute(
+            "SELECT messages FROM chat_streams WHERE thread_id = %s", ("thd3",)
+        )
+        existing_record = cursor.fetchone()
+        assert existing_record is not None
+        assert existing_record[0] == ["Hello", " World"]
 
 
 def test_persist_not_attempted_when_saver_disabled():
@@ -173,29 +154,9 @@ def test_persist_mongodb_local_db():
 def test_persist_mongodb_called_with_aggregated_chunks(monkeypatch):
     """On 'stop', aggregated chunks should be passed to MongoDB persist method."""
 
-    # Avoid real connection by making mongo_db truthy so MongoDB branch is used
-    def _fake_mongo(self):
-        self.mongo_client = None
-        self.mongo_db = object()
-
-    monkeypatch.setattr(
-        checkpoint.ChatStreamManager, "_init_mongodb", _fake_mongo, raising=True
-    )
-
     manager = checkpoint.ChatStreamManager(
         checkpoint_saver=True,
         db_uri=MONGO_URL,
-    )
-
-    captured = {}
-
-    def fake_persist(self, thread_id, messages):  # signature must match
-        captured["thread_id"] = thread_id
-        captured["messages"] = messages
-        return True
-
-    monkeypatch.setattr(
-        checkpoint.ChatStreamManager, "_persist_to_mongodb", fake_persist, raising=True
     )
 
     assert (
@@ -205,9 +166,11 @@ def test_persist_mongodb_called_with_aggregated_chunks(monkeypatch):
         manager.process_stream_message("thd5", " World", finish_reason="stop") is True
     )
 
-    assert captured["thread_id"] == "thd5"
-    # Order is expected to be chunk_0, chunk_1
-    assert captured["messages"] == ["Hello", " World"]
+    # Verify the messages were aggregated correctly
+    collection = manager.mongo_db.chat_streams
+    existing_record = collection.find_one({"thread_id": "thd5"})
+    assert existing_record is not None
+    assert existing_record["messages"] == ["Hello", " World"]
 
 
 def test_invalid_inputs_return_false(monkeypatch):
@@ -531,7 +494,7 @@ def test_init_postgresql_calls_connect_and_create_table(monkeypatch):
 
     def fake_connect(self):
         flags["connected"] += 1
-        fake_create()
+        self.fake_create()
         return FakeConn()
 
     def fake_create(self):
