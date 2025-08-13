@@ -16,6 +16,14 @@ from src.llms.providers.dashscope import (
     _convert_chunk_to_generation_chunk,
 )
 from src.llms import llm as llm_module
+from langchain_core.messages import ChatMessageChunk
+from src.llms.providers import dashscope as dashscope_module
+
+from src.llms.providers.dashscope import (
+    ChatDashscope,
+    _convert_delta_to_message_chunk,
+    _convert_chunk_to_generation_chunk,
+)
 
 
 class DummyChatDashscope:
@@ -141,3 +149,163 @@ def test_llm_verify_ssl_false_adds_http_clients(monkeypatch, dashscope_conf):
     inst = llm_module._create_llm_use_conf("basic", dashscope_conf)
     assert "http_client" in inst.kwargs
     assert "http_async_client" in inst.kwargs
+
+
+def test_convert_delta_to_message_chunk_developer_and_function_call_and_tool_calls():
+    # developer role -> SystemMessageChunk with __openai_role__
+    delta = {"role": "developer", "content": "dev rules"}
+    msg = _convert_delta_to_message_chunk(delta, SystemMessageChunk)
+    assert isinstance(msg, SystemMessageChunk)
+    assert msg.additional_kwargs.get("__openai_role__") == "developer"
+
+    # function_call name None -> empty string
+    delta = {"role": "assistant", "function_call": {"name": None, "arguments": "{}"}}
+    msg = _convert_delta_to_message_chunk(delta, AIMessageChunk)
+    assert isinstance(msg, AIMessageChunk)
+    assert msg.additional_kwargs["function_call"]["name"] == ""
+
+    # tool_calls: one valid, one missing function -> should not crash and create one chunk
+    delta = {
+        "role": "assistant",
+        "tool_calls": [
+            {"id": "t1", "index": 0, "function": {"name": "f", "arguments": "{}"}},
+            {"id": "t2", "index": 1},  # missing function key
+        ],
+    }
+    msg = _convert_delta_to_message_chunk(delta, AIMessageChunk)
+    assert isinstance(msg, AIMessageChunk)
+    # tool_calls copied as-is
+    assert msg.additional_kwargs["tool_calls"][0]["id"] == "t1"
+    # tool_call_chunks only for valid one
+    assert getattr(msg, "tool_call_chunks") and len(msg.tool_call_chunks) == 1
+
+
+def test_convert_delta_to_message_chunk_default_class_and_unknown_role():
+    # No role, default human -> HumanMessageChunk
+    delta = {"content": "hey"}
+    msg = _convert_delta_to_message_chunk(delta, HumanMessageChunk)
+    assert isinstance(msg, HumanMessageChunk)
+
+    # Unknown role -> ChatMessageChunk with that role
+    delta = {"role": "observer", "content": "hmm"}
+    msg = _convert_delta_to_message_chunk(delta, ChatMessageChunk)
+    assert isinstance(msg, ChatMessageChunk)
+    assert msg.role == "observer"
+
+
+def test_convert_chunk_to_generation_chunk_empty_choices_and_usage():
+    chunk = {
+        "choices": [],
+        "usage": {"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3},
+    }
+    gen = _convert_chunk_to_generation_chunk(chunk, AIMessageChunk, None)
+    assert gen is not None
+    assert isinstance(gen.message, AIMessageChunk)
+    assert gen.message.content == ""
+    assert getattr(gen.message, "usage_metadata", None) is not None
+    assert gen.generation_info is None
+
+
+def test_convert_chunk_to_generation_chunk_includes_base_info_and_logprobs():
+    chunk = {
+        "choices": [
+            {
+                "delta": {"role": "assistant", "content": "T"},
+                "logprobs": {"content": [{"token": "T", "logprob": -0.1}]},
+            }
+        ]
+    }
+    base_info = {"headers": {"a": "b"}}
+    gen = _convert_chunk_to_generation_chunk(chunk, AIMessageChunk, base_info)
+    assert gen is not None
+    assert gen.message.content == "T"
+    assert gen.generation_info.get("headers") == {"a": "b"}
+    assert "logprobs" in gen.generation_info
+
+
+def test_convert_chunk_to_generation_chunk_beta_stream_format():
+    chunk = {
+        "chunk": {
+            "choices": [
+                {"delta": {"role": "assistant", "content": "From beta stream format"}}
+            ]
+        }
+    }
+    gen = _convert_chunk_to_generation_chunk(chunk, AIMessageChunk, None)
+    assert gen is not None
+    assert gen.message.content == "From beta stream format"
+
+
+def test_chatdashscope_create_chat_result_adds_reasoning_content(monkeypatch):
+    # Dummy objects for the super() return
+    class DummyMsg:
+        def __init__(self):
+            self.additional_kwargs = {}
+
+    class DummyGen:
+        def __init__(self):
+            self.message = DummyMsg()
+
+    class DummyChatResult:
+        def __init__(self):
+            self.generations = [DummyGen()]
+
+    # Patch super()._create_chat_result to return our dummy structure
+    def fake_super_create(self, response, generation_info=None):
+        return DummyChatResult()
+
+    monkeypatch.setattr(
+        dashscope_module.ChatOpenAI, "_create_chat_result", fake_super_create
+    )
+
+    # Patch openai.BaseModel in the module under test
+    class DummyBaseModel:
+        pass
+
+    monkeypatch.setattr(dashscope_module.openai, "BaseModel", DummyBaseModel)
+
+    # Build a fake OpenAI-like response with reasoning_content
+    class RMsg:
+        def __init__(self, rc):
+            self.reasoning_content = rc
+
+    class Choice:
+        def __init__(self, rc):
+            self.message = RMsg(rc)
+
+    class FakeResponse(DummyBaseModel):
+        def __init__(self):
+            self.choices = [Choice("Reasoning...")]
+
+    llm = ChatDashscope(model="dummy", api_key="k")
+    result = llm._create_chat_result(FakeResponse())
+    assert (
+        result.generations[0].message.additional_kwargs.get("reasoning_content")
+        == "Reasoning..."
+    )
+
+
+def test_chatdashscope_create_chat_result_dict_passthrough(monkeypatch):
+    class DummyMsg:
+        def __init__(self):
+            self.additional_kwargs = {}
+
+    class DummyGen:
+        def __init__(self):
+            self.message = DummyMsg()
+
+    class DummyChatResult:
+        def __init__(self):
+            self.generations = [DummyGen()]
+
+    def fake_super_create(self, response, generation_info=None):
+        return DummyChatResult()
+
+    monkeypatch.setattr(
+        dashscope_module.ChatOpenAI, "_create_chat_result", fake_super_create
+    )
+
+    llm = ChatDashscope(model="dummy", api_key="k")
+    result = llm._create_chat_result({"raw": "dict"})
+    # Should not inject reasoning_content for dict responses
+    assert "reasoning_content" not in result.generations[0].message.additional_kwargs
