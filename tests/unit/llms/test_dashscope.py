@@ -49,7 +49,7 @@ def test_convert_delta_to_message_chunk_roles_and_extras():
             {
                 "id": "call_1",
                 "index": 0,
-                "function": {"name": "lookup", "arguments": "{\\\"q\\\":\\\"x\\\"}"},
+                "function": {"name": "lookup", "arguments": '{\\"q\\":\\"x\\"}'},
             }
         ],
     }
@@ -83,9 +83,12 @@ def test_convert_delta_to_message_chunk_roles_and_extras():
 
 def test_convert_chunk_to_generation_chunk_skip_and_usage():
     # Skips content.delta type
-    assert _convert_chunk_to_generation_chunk(
-        {"type": "content.delta"}, AIMessageChunk, None
-    ) is None
+    assert (
+        _convert_chunk_to_generation_chunk(
+            {"type": "content.delta"}, AIMessageChunk, None
+        )
+        is None
+    )
 
     # Proper chunk with usage and finish info
     chunk = {
@@ -130,7 +133,10 @@ def test_llm_verify_ssl_false_adds_http_clients(monkeypatch, dashscope_conf):
     monkeypatch.setattr(llm_module, "ChatDashscope", DummyChatDashscope)
     # turn off ssl
     dashscope_conf = {**dashscope_conf}
-    dashscope_conf["BASIC_MODEL"] = {**dashscope_conf["BASIC_MODEL"], "verify_ssl": False}
+    dashscope_conf["BASIC_MODEL"] = {
+        **dashscope_conf["BASIC_MODEL"],
+        "verify_ssl": False,
+    }
 
     inst = llm_module._create_llm_use_conf("basic", dashscope_conf)
     assert "http_client" in inst.kwargs
