@@ -123,7 +123,7 @@ def test_persist_postgresql_called_with_aggregated_chunks(monkeypatch):
         )
         existing_record = cursor.fetchone()
         assert existing_record is not None
-        assert existing_record[0]["messages"] == ["Hello", " World"]
+        assert existing_record["messages"] == ["Hello", " World"]
 
 
 def test_persist_not_attempted_when_saver_disabled():
@@ -192,37 +192,205 @@ def test_invalid_inputs_return_false(monkeypatch):
     assert manager.process_stream_message("tid", "", finish_reason="partial") is False
 
 
-def test_no_db_connection_available_returns_false(monkeypatch):
-    """Stop should return False when no DB connection is available."""
-
-    # Ensure no DBs are initialized
-    def _no_db(self):
-        self.mongo_client = None
-        self.mongo_db = None
-        self.postgres_conn = None
-
-    monkeypatch.setattr(
-        checkpoint.ChatStreamManager, "_init_mongodb", _no_db, raising=True
+def test_unsupported_db_uri_scheme():
+    """Manager should log warning for unsupported database URI schemes."""
+    manager = checkpoint.ChatStreamManager(
+        checkpoint_saver=True, db_uri="redis://localhost:6379/0"
     )
+    # Should not have any database connections
+    assert manager.mongo_client is None
+    assert manager.postgres_conn is None
+    assert manager.mongo_db is None
+
+
+def test_process_stream_with_interrupt_finish_reason():
+    """Test that 'interrupt' finish_reason triggers persistence like 'stop'."""
+    manager = checkpoint.ChatStreamManager(
+        checkpoint_saver=True,
+        db_uri=MONGO_URL,
+    )
+
+    # Add partial message
+    assert (
+        manager.process_stream_message(
+            "int_test", "Interrupted", finish_reason="partial"
+        )
+        is True
+    )
+    # Interrupt should trigger persistence
+    assert (
+        manager.process_stream_message(
+            "int_test", " message", finish_reason="interrupt"
+        )
+        is True
+    )
+
+
+def test_postgresql_connection_failure(monkeypatch):
+    """Test PostgreSQL connection failure handling."""
+
+    def failing_connect(dsn, **kwargs):
+        raise RuntimeError("Connection failed")
+
+    monkeypatch.setattr("psycopg.connect", failing_connect)
+
+    manager = checkpoint.ChatStreamManager(
+        checkpoint_saver=True,
+        db_uri=POSTGRES_URL,
+    )
+    # Should have no postgres connection on failure
+    assert manager.postgres_conn is None
+
+
+def test_mongodb_ping_failure(monkeypatch):
+    """Test MongoDB ping failure during initialization."""
+
+    class FakeAdmin:
+        def command(self, name):
+            raise RuntimeError("Ping failed")
+
+    class FakeClient:
+        def __init__(self, uri):
+            self.admin = FakeAdmin()
+
+    monkeypatch.setattr(checkpoint, "MongoClient", lambda uri: FakeClient(uri))
 
     manager = checkpoint.ChatStreamManager(
         checkpoint_saver=True,
         db_uri=MONGO_URL,
     )
-    # partial stores chunk
-    assert manager.process_stream_message("t6", "hi", finish_reason="partial") is True
-    # stop tries to persist, but no db connection => False
-    assert manager.process_stream_message("t6", "!", finish_reason="stop") is False
+    # Should not have mongo_db set on ping failure
+    assert getattr(manager, "mongo_db", None) is None
 
 
-def test_persist_complete_no_messages_returns_false():
-    """Persist should early-return False when no buffered chunks exist."""
-    manager = checkpoint.ChatStreamManager(checkpoint_saver=True, db_uri=MONGO_URL)
-    message_namespace = ("messages", "empty")
-    # No chunks stored; persist should detect no messages
+def test_store_namespace_consistency():
+    """Test that store namespace is consistently used across methods."""
+    manager = checkpoint.ChatStreamManager(checkpoint_saver=False)
+
+    # Process a partial message
     assert (
-        manager._persist_complete_conversation("empty", message_namespace, 0) is False
+        manager.process_stream_message("ns_test", "chunk1", finish_reason="partial")
+        is True
     )
+
+    # Verify cursor is stored correctly
+    cursor = manager.store.get(("messages", "ns_test"), "cursor")
+    assert cursor is not None
+    assert cursor.value["index"] == 0
+
+    # Add another chunk
+    assert (
+        manager.process_stream_message("ns_test", "chunk2", finish_reason="partial")
+        is True
+    )
+
+    # Verify cursor is incremented
+    cursor = manager.store.get(("messages", "ns_test"), "cursor")
+    assert cursor.value["index"] == 1
+
+
+def test_empty_messages_list_handling():
+    """Test behavior when messages list is empty during persistence."""
+    manager = checkpoint.ChatStreamManager(checkpoint_saver=True, db_uri=MONGO_URL)
+
+    # Mock store to return no messages
+    original_search = manager.store.search
+
+    def mock_search(namespace, limit=None):
+        # Return only cursor, no actual message chunks
+        return [type("Item", (), {"dict": lambda: {"value": {"index": 0}}})()]
+
+    manager.store.search = mock_search
+
+    # This should return False due to no messages
+    result = manager._persist_complete_conversation(
+        "empty_test", ("messages", "empty_test"), 0
+    )
+    assert result is False
+
+
+def test_process_stream_exception_handling(monkeypatch):
+    """Test exception handling in process_stream_message."""
+    manager = checkpoint.ChatStreamManager(checkpoint_saver=False)
+
+    # Mock store.put to raise an exception
+    def failing_put(*args, **kwargs):
+        raise RuntimeError("Store operation failed")
+
+    monkeypatch.setattr(manager.store, "put", failing_put)
+
+    # Should return False when exception occurs
+    result = manager.process_stream_message(
+        "exc_test", "message", finish_reason="partial"
+    )
+    assert result is False
+
+
+def test_cursor_initialization_edge_cases():
+    """Test cursor handling edge cases."""
+    manager = checkpoint.ChatStreamManager(checkpoint_saver=False)
+
+    # Manually set a cursor with missing index
+    namespace = ("messages", "edge_test")
+    manager.store.put(namespace, "cursor", {})  # Missing 'index' key
+
+    # Should handle missing index gracefully
+    result = manager.process_stream_message(
+        "edge_test", "test", finish_reason="partial"
+    )
+    assert result is True
+
+    # Should default to 0 and increment to 1
+    cursor = manager.store.get(namespace, "cursor")
+    assert cursor.value["index"] == 1
+
+
+def test_multiple_threads_isolation():
+    """Test that different thread_ids are properly isolated."""
+    manager = checkpoint.ChatStreamManager(checkpoint_saver=False)
+
+    # Process messages for different threads
+    assert (
+        manager.process_stream_message("thread1", "msg1", finish_reason="partial")
+        is True
+    )
+    assert (
+        manager.process_stream_message("thread2", "msg2", finish_reason="partial")
+        is True
+    )
+    assert (
+        manager.process_stream_message("thread1", "msg3", finish_reason="partial")
+        is True
+    )
+
+    # Verify isolation
+    thread1_items = manager.store.search(("messages", "thread1"), limit=10)
+    thread2_items = manager.store.search(("messages", "thread2"), limit=10)
+
+    thread1_values = [
+        item.dict()["value"]
+        for item in thread1_items
+        if isinstance(item.dict()["value"], str)
+    ]
+    thread2_values = [
+        item.dict()["value"]
+        for item in thread2_items
+        if isinstance(item.dict()["value"], str)
+    ]
+
+    assert "msg1" in thread1_values
+    assert "msg3" in thread1_values
+    assert "msg2" in thread2_values
+    assert "msg1" not in thread2_values
+    assert "msg2" not in thread1_values
+
+
+def test_db_uri_none_handling():
+    """Test handling when db_uri is None."""
+    manager = checkpoint.ChatStreamManager(checkpoint_saver=True, db_uri=None)
+    # Should not crash but also not initialize any connections
+    assert manager.mongo_client is None
+    assert manager.postgres_conn is None
 
 
 def test_mongodb_insert_and_update_paths(monkeypatch):
