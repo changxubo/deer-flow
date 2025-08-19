@@ -27,6 +27,7 @@ from src.ppt.graph.builder import build_graph as build_ppt_graph
 from src.prompt_enhancer.graph.builder import build_graph as build_prompt_enhancer_graph
 from src.prose.graph.builder import build_graph as build_prose_graph
 from src.rag.builder import build_retriever
+from src.rag.milvus import load_examples
 from src.rag.retriever import Resource
 from src.server.chat_request import (
     ChatRequest,
@@ -73,6 +74,10 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],  # Use the configured list of methods
     allow_headers=["*"],  # Now allow all headers, but can be restricted further
 )
+
+# Load examples into Milvus if configured
+load_examples()
+
 in_memory_store = InMemoryStore()
 graph = build_graph_with_memory()
 
