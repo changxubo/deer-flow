@@ -10,6 +10,7 @@ import pytest
 from src.rag import milvus as milvus_mod
 from src.rag.milvus import MilvusProvider
 from src.rag.retriever import Resource
+from pathlib import Path
 
 
 class _DummyEmbeddings:
@@ -658,3 +659,154 @@ def test_dashscope_embeddings_empty_inputs_short_circuit(monkeypatch):
 
     emb._client = FailingClient()  # type: ignore
     assert emb.embed_documents([]) == []
+
+
+# Tests for _init_embedding_model provider selection logic
+def test_init_embedding_model_openai(monkeypatch):
+    monkeypatch.setenv("MILVUS_EMBEDDING_PROVIDER", "openai")
+    captured = {}
+
+    class CapturingEmb:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(milvus_mod, "OpenAIEmbeddings", CapturingEmb)
+    prov = MilvusProvider()
+    assert isinstance(prov.embedding_model, CapturingEmb)
+    # kwargs forwarded
+    assert (
+        captured["model"] == pytest.environ.get("MILVUS_EMBEDDING_MODEL")
+        or "text-embedding-ada-002"
+    )
+    assert captured["encoding_format"] == "float"
+    assert captured["dimensions"] == prov.embedding_dim
+
+
+def test_init_embedding_model_dashscope(monkeypatch):
+    monkeypatch.setenv("MILVUS_EMBEDDING_PROVIDER", "dashscope")
+    captured = {}
+
+    class CapturingDashscope:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(milvus_mod, "DashscopeEmbeddings", CapturingDashscope)
+    prov = MilvusProvider()
+    assert isinstance(prov.embedding_model, CapturingDashscope)
+    assert (
+        captured["model"] == pytest.environ.get("MILVUS_EMBEDDING_MODEL")
+        or "text-embedding-ada-002"
+    )
+    assert captured["encoding_format"] == "float"
+    assert captured["dimensions"] == prov.embedding_dim
+
+
+def test_init_embedding_model_invalid_provider(monkeypatch):
+    monkeypatch.setenv("MILVUS_EMBEDDING_PROVIDER", "not_a_provider")
+    with pytest.raises(ValueError):
+        MilvusProvider()
+
+
+def test_load_example_files_directory_missing(monkeypatch):
+    _patch_init(monkeypatch)
+    missing_dir = "examples_dir_does_not_exist_xyz"
+    monkeypatch.setenv("MILVUS_EXAMPLES_DIR", missing_dir)
+    retriever = MilvusProvider()
+    retriever.examples_dir = missing_dir
+    called = {"insert": 0}
+    monkeypatch.setattr(
+        retriever,
+        "_insert_document_chunk",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("should not insert")),
+    )
+    retriever._load_example_files()
+    assert called["insert"] == 0  # sanity (no insertion attempted)
+
+
+def test_load_example_files_loads_and_skips_existing(monkeypatch):
+    _patch_init(monkeypatch)
+    project_root = Path(milvus_mod.__file__).parent.parent.parent
+    examples_dir_name = "examples_test_load_skip"
+    examples_path = project_root / examples_dir_name
+    examples_path.mkdir(exist_ok=True)
+
+    file1 = examples_path / "file1.md"
+    file2 = examples_path / "file2.md"
+    file1.write_text("# Title One\nContent A", encoding="utf-8")
+    file2.write_text("# Title Two\nContent B", encoding="utf-8")
+
+    monkeypatch.setenv("MILVUS_EXAMPLES_DIR", examples_dir_name)
+    retriever = MilvusProvider()
+    retriever.examples_dir = examples_dir_name
+
+    # Compute doc ids using real method
+    doc_id_file1 = retriever._generate_doc_id(file1)
+    doc_id_file2 = retriever._generate_doc_id(file2)
+
+    # Existing docs contains file1 so it is skipped
+    monkeypatch.setattr(retriever, "_get_existing_document_ids", lambda: {doc_id_file1})
+    # Force two chunks for any file to test suffix logic
+    monkeypatch.setattr(retriever, "_split_content", lambda content: ["part1", "part2"])
+
+    calls = []
+
+    def record_insert(doc_id, content, title, url, metadata):
+        calls.append(
+            {
+                "doc_id": doc_id,
+                "content": content,
+                "title": title,
+                "url": url,
+                "metadata": metadata,
+            }
+        )
+
+    monkeypatch.setattr(retriever, "_insert_document_chunk", record_insert)
+
+    retriever._load_example_files()
+
+    # Only file2 processed -> two chunk inserts
+    assert len(calls) == 2
+    expected_ids = {f"{doc_id_file2}_chunk_0", f"{doc_id_file2}_chunk_1"}
+    assert {c["doc_id"] for c in calls} == expected_ids
+    assert all(c["metadata"]["file"] == "file2.md" for c in calls)
+    assert all(c["metadata"]["source"] == "examples" for c in calls)
+    assert all(c["title"] == "Title Two" for c in calls)
+
+
+def test_load_example_files_single_chunk_no_suffix(monkeypatch):
+    _patch_init(monkeypatch)
+    project_root = Path(milvus_mod.__file__).parent.parent.parent
+    examples_dir_name = "examples_test_single_chunk"
+    examples_path = project_root / examples_dir_name
+    examples_path.mkdir(exist_ok=True)
+
+    file_single = examples_path / "single.md"
+    file_single.write_text(
+        "# Single Title\nOnly one small paragraph.", encoding="utf-8"
+    )
+
+    monkeypatch.setenv("MILVUS_EXAMPLES_DIR", examples_dir_name)
+    retriever = MilvusProvider()
+    retriever.examples_dir = examples_dir_name
+
+    base_doc_id = retriever._generate_doc_id(file_single)
+
+    monkeypatch.setattr(retriever, "_get_existing_document_ids", lambda: set())
+    monkeypatch.setattr(retriever, "_split_content", lambda content: ["onlychunk"])
+
+    captured = {}
+
+    def capture(doc_id, content, title, url, metadata):
+        captured["doc_id"] = doc_id
+        captured["title"] = title
+        captured["metadata"] = metadata
+
+    monkeypatch.setattr(retriever, "_insert_document_chunk", capture)
+
+    retriever._load_example_files()
+
+    assert captured["doc_id"] == base_doc_id  # no _chunk_ suffix
+    assert captured["title"] == "Single Title"
+    assert captured["metadata"]["file"] == "single.md"
+    assert captured["metadata"]["source"] == "examples"
