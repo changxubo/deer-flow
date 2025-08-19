@@ -2,42 +2,44 @@
 # SPDX-License-Identifier: MIT
 
 from __future__ import annotations
-
+from uuid import uuid4
 from types import SimpleNamespace
-
+from pathlib import Path
 import pytest
 
-from src.rag import milvus as milvus_mod
+import src.rag.milvus as milvus_mod
 from src.rag.milvus import MilvusProvider
 from src.rag.retriever import Resource
-from pathlib import Path
 
 
-class _DummyEmbeddings:
-    """Deterministic dummy embedding model to avoid external dependencies.
-    Mimics the minimal interface needed by the retriever. Always returns the
-    same vector (or a provided one) to keep tests deterministic & fast.
-    """
+class DummyEmbedding:
 
-    def __init__(self, vec=None):
-        self.vec = vec or [0.1, 0.2, 0.3]
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
 
-    def embed_query(self, text: str):  # returns deterministic list
-        """Return a copy of the static embedding vector."""
-        return list(self.vec)
+    def embed_query(self, text: str):
+        return [0.1, 0.2, 0.3]
+
+    def embed_documents(self, texts):
+        return [[0.1, 0.2, 0.3] for _ in texts]
 
 
 @pytest.fixture(autouse=True)
-def base_env(monkeypatch):
-    """Provide baseline env vars & patch embedding model for all tests.
-    Ensures tests do not make network calls or depend on real Milvus instances.
-    """
+def patch_embeddings(monkeypatch):
+    # Prevent network / external API usage during __init__
+    monkeypatch.setenv("MILVUS_EMBEDDING_PROVIDER", "openai")
     monkeypatch.setenv("MILVUS_EMBEDDING_MODEL", "text-embedding-ada-002")
-    monkeypatch.setenv("MILVUS_COLLECTION", "cov_collection")
-    monkeypatch.setenv("MILVUS_URI", "local.db")  # default lite
-    # Ensure embeddings code path is patched (avoid external deps)
-    monkeypatch.setattr(milvus_mod, "OpenAIEmbeddings", _DummyEmbeddings, raising=False)
+    monkeypatch.setenv("MILVUS_COLLECTION", "documents")
+    monkeypatch.setenv("MILVUS_URI", "./milvus_demo.db")  # default lite
+    monkeypatch.setattr(milvus_mod, "OpenAIEmbeddings", DummyEmbedding)
+    monkeypatch.setattr(milvus_mod, "DashscopeEmbeddings", DummyEmbedding)
     yield
+
+
+@pytest.fixture
+def project_root():
+    # Mirror logic from implementation: current_file.parent.parent.parent
+    return Path(milvus_mod.__file__).parent.parent.parent
 
 
 def _patch_init(monkeypatch):
@@ -45,8 +47,86 @@ def _patch_init(monkeypatch):
     monkeypatch.setattr(
         MilvusProvider,
         "_init_embedding_model",
-        lambda self: setattr(self, "embedding_model", _DummyEmbeddings()),
+        lambda self: setattr(self, "embedding_model", DummyEmbedding()),
     )
+
+
+def test_list_local_markdown_resources_missing_dir(project_root):
+    retriever = MilvusProvider()
+    # Point to a non-existent examples dir
+    retriever.examples_dir = f"missing_examples_{uuid4().hex}"
+    resources = retriever._list_local_markdown_resources()
+    assert resources == []
+
+
+def test_list_local_markdown_resources_populated(project_root):
+    retriever = MilvusProvider()
+    examples_dir = f"examples_test_{uuid4().hex}"
+    retriever.examples_dir = examples_dir
+    target_dir = project_root / examples_dir
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    # File with heading
+    (target_dir / "file1.md").write_text(
+        "# Title One\n\nContent body.", encoding="utf-8"
+    )
+    # File without heading -> fallback title
+    (target_dir / "file_two.md").write_text("No heading here.", encoding="utf-8")
+    # Non-markdown file should be ignored
+    (target_dir / "ignore.txt").write_text("Should not be picked up.", encoding="utf-8")
+
+    resources = retriever._list_local_markdown_resources()
+    # Order not guaranteed; sort by uri for assertions
+    resources.sort(key=lambda r: r.uri)
+
+    # Expect two resources
+    assert len(resources) == 2
+    uris = {r.uri for r in resources}
+    assert uris == {
+        f"milvus://{retriever.collection_name}/file1.md",
+        f"milvus://{retriever.collection_name}/file_two.md",
+    }
+
+    res_map = {r.uri: r for r in resources}
+    r1 = res_map[f"milvus://{retriever.collection_name}/file1.md"]
+    assert isinstance(r1, Resource)
+    assert r1.title == "Title One"
+    assert r1.description == "Local markdown example (not yet ingested)"
+
+    r2 = res_map[f"milvus://{retriever.collection_name}/file_two.md"]
+    # Fallback logic: filename -> "file_two" -> "file two" -> title case -> "File Two"
+    assert r2.title == "File Two"
+    assert r2.description == "Local markdown example (not yet ingested)"
+
+
+def test_list_local_markdown_resources_read_error(monkeypatch, project_root):
+    retriever = MilvusProvider()
+    examples_dir = f"examples_error_{uuid4().hex}"
+    retriever.examples_dir = examples_dir
+    target_dir = project_root / examples_dir
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    bad_file = target_dir / "bad.md"
+    good_file = target_dir / "good.md"
+    good_file.write_text("# Good Title\n\nBody.", encoding="utf-8")
+    bad_file.write_text("Broken", encoding="utf-8")
+
+    # Patch Path.read_text to raise for bad.md only
+    original_read_text = Path.read_text
+
+    def fake_read_text(self, *args, **kwargs):
+        if self == bad_file:
+            raise OSError("Cannot read file")
+        return original_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", fake_read_text)
+
+    resources = retriever._list_local_markdown_resources()
+    # Only good.md should appear
+    assert len(resources) == 1
+    r = resources[0]
+    assert r.title == "Good Title"
+    assert r.uri == f"milvus://{retriever.collection_name}/good.md"
 
 
 def test_create_collection_schema_fields(monkeypatch):
@@ -664,6 +744,7 @@ def test_dashscope_embeddings_empty_inputs_short_circuit(monkeypatch):
 # Tests for _init_embedding_model provider selection logic
 def test_init_embedding_model_openai(monkeypatch):
     monkeypatch.setenv("MILVUS_EMBEDDING_PROVIDER", "openai")
+    monkeypatch.setenv("MILVUS_EMBEDDING_MODEL", "text-embedding-ada-002")
     captured = {}
 
     class CapturingEmb:
@@ -674,16 +755,14 @@ def test_init_embedding_model_openai(monkeypatch):
     prov = MilvusProvider()
     assert isinstance(prov.embedding_model, CapturingEmb)
     # kwargs forwarded
-    assert (
-        captured["model"] == pytest.environ.get("MILVUS_EMBEDDING_MODEL")
-        or "text-embedding-ada-002"
-    )
+    assert captured["model"] == "text-embedding-ada-002"
     assert captured["encoding_format"] == "float"
     assert captured["dimensions"] == prov.embedding_dim
 
 
 def test_init_embedding_model_dashscope(monkeypatch):
     monkeypatch.setenv("MILVUS_EMBEDDING_PROVIDER", "dashscope")
+    monkeypatch.setenv("MILVUS_EMBEDDING_MODEL", "text-embedding-ada-002")
     captured = {}
 
     class CapturingDashscope:
@@ -693,10 +772,7 @@ def test_init_embedding_model_dashscope(monkeypatch):
     monkeypatch.setattr(milvus_mod, "DashscopeEmbeddings", CapturingDashscope)
     prov = MilvusProvider()
     assert isinstance(prov.embedding_model, CapturingDashscope)
-    assert (
-        captured["model"] == pytest.environ.get("MILVUS_EMBEDDING_MODEL")
-        or "text-embedding-ada-002"
-    )
+    assert captured["model"] == "text-embedding-ada-002"
     assert captured["encoding_format"] == "float"
     assert captured["dimensions"] == prov.embedding_dim
 
