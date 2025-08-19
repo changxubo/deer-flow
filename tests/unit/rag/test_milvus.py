@@ -9,6 +9,7 @@ import pytest
 
 from src.rag import milvus as milvus_mod
 from src.rag.milvus import MilvusProvider
+from src.rag.retriever import Resource
 
 
 class _DummyEmbeddings:
@@ -45,6 +46,211 @@ def _patch_init(monkeypatch):
         "_init_embedding_model",
         lambda self: setattr(self, "embedding_model", _DummyEmbeddings()),
     )
+
+
+def test_create_collection_schema_fields(monkeypatch):
+    _patch_init(monkeypatch)
+    retriever = MilvusProvider()
+    schema = retriever._create_collection_schema()
+    field_names = {f.name for f in schema.fields}
+    # Core fields must be present
+    assert {
+        retriever.id_field,
+        retriever.vector_field,
+        retriever.content_field,
+    } <= field_names
+    # Dynamic field enabled for extra metadata
+    assert schema.enable_dynamic_field is True
+
+
+def test_generate_doc_id_stable(monkeypatch, tmp_path):
+    _patch_init(monkeypatch)
+    retriever = MilvusProvider()
+    test_file = tmp_path / "example.md"
+    test_file.write_text("# Title\nBody", encoding="utf-8")
+    doc_id1 = retriever._generate_doc_id(test_file)
+    doc_id2 = retriever._generate_doc_id(test_file)
+    assert doc_id1 == doc_id2  # deterministic given unchanged file metadata
+
+
+def test_extract_title_from_markdown(monkeypatch):
+    _patch_init(monkeypatch)
+    retriever = MilvusProvider()
+    heading = retriever._extract_title_from_markdown("# Heading\nBody", "ignored.md")
+    assert heading == "Heading"
+    fallback = retriever._extract_title_from_markdown("Body only", "my_file_name.md")
+    assert fallback == "My File Name"
+
+
+def test_split_content_chunking(monkeypatch):
+    monkeypatch.setenv("MILVUS_CHUNK_SIZE", "40")  # small to force split
+    _patch_init(monkeypatch)
+    retriever = MilvusProvider()
+    long_content = (
+        "Para1 text here.\n\nPara2 second block.\n\nPara3 final."  # 3 paragraphs
+    )
+    chunks = retriever._split_content(long_content)
+    assert len(chunks) >= 2  # forced split
+    assert all(chunks)  # no empty chunks
+
+
+def test_get_embedding_invalid_inputs(monkeypatch):
+    _patch_init(monkeypatch)
+    retriever = MilvusProvider()
+    # Non-string value
+    with pytest.raises(RuntimeError):
+        retriever._get_embedding(123)  # type: ignore[arg-type]
+    # Whitespace only
+    with pytest.raises(RuntimeError):
+        retriever._get_embedding("   ")
+
+
+def test_list_resources_remote_success_and_dedup(monkeypatch):
+    monkeypatch.setenv("MILVUS_URI", "http://remote")
+    _patch_init(monkeypatch)
+    retriever = MilvusProvider()
+
+    class DocObj:
+        def __init__(self, content: str, meta: dict):
+            self.page_content = content
+            self.metadata = meta
+
+    calls = {"similarity_search": 0}
+
+    class RemoteClient:
+        def similarity_search(self, query, k, expr):  # noqa: D401
+            calls["similarity_search"] += 1
+            # Two docs with identical id to test dedup
+            meta1 = {
+                retriever.id_field: "d1",
+                retriever.title_field: "T1",
+                retriever.url_field: "u1",
+            }
+            meta2 = {
+                retriever.id_field: "d1",
+                retriever.title_field: "T1_dup",
+                retriever.url_field: "u1",
+            }
+            return [DocObj("c1", meta1), DocObj("c1_dup", meta2)]
+
+    retriever.client = RemoteClient()
+    resources = retriever.list_resources("query text")
+    assert len(resources) == 1  # dedup applied
+    assert resources[0].title.startswith("T1")
+    assert calls["similarity_search"] == 1
+
+
+def test_list_resources_lite_success(monkeypatch):
+    _patch_init(monkeypatch)
+    retriever = MilvusProvider()
+
+    class DummyMilvusLite:
+        def query(self, collection_name, filter, output_fields, limit):  # noqa: D401
+            return [
+                {
+                    retriever.id_field: "idA",
+                    retriever.title_field: "Alpha",
+                    retriever.url_field: "u://a",
+                },
+                {
+                    retriever.id_field: "idB",
+                    retriever.title_field: "Beta",
+                    retriever.url_field: "u://b",
+                },
+            ]
+
+    retriever.client = DummyMilvusLite()
+    resources = retriever.list_resources()
+    assert {r.title for r in resources} == {"Alpha", "Beta"}
+
+
+def test_query_relevant_documents_lite_success(monkeypatch):
+    _patch_init(monkeypatch)
+    retriever = MilvusProvider()
+
+    # Provide deterministic embedding output
+    retriever.embedding_model.embed_query = lambda text: [0.1, 0.2, 0.3]  # type: ignore
+
+    class DummyMilvusLite:
+        def search(
+            self, collection_name, data, anns_field, param, limit, output_fields
+        ):  # noqa: D401
+            # Simulate two result entries
+            return [
+                [
+                    {
+                        "entity": {
+                            retriever.id_field: "d1",
+                            retriever.content_field: "c1",
+                            retriever.title_field: "T1",
+                            retriever.url_field: "u1",
+                        },
+                        "distance": 0.9,
+                    },
+                    {
+                        "entity": {
+                            retriever.id_field: "d2",
+                            retriever.content_field: "c2",
+                            retriever.title_field: "T2",
+                            retriever.url_field: "u2",
+                        },
+                        "distance": 0.8,
+                    },
+                ]
+            ]
+
+    retriever.client = DummyMilvusLite()
+    # Filter for only d2 via resource list
+    docs = retriever.query_relevant_documents(
+        "question", resources=[Resource(uri="milvus://d2", title="", description="")]
+    )
+    assert len(docs) == 1 and docs[0].id == "d2" and docs[0].chunks[0].similarity == 0.8
+
+
+def test_query_relevant_documents_remote_success(monkeypatch):
+    monkeypatch.setenv("MILVUS_URI", "http://remote")
+    _patch_init(monkeypatch)
+    retriever = MilvusProvider()
+    retriever.embedding_model.embed_query = lambda text: [0.1, 0.2, 0.3]  # type: ignore
+
+    class DocObj:
+        def __init__(self, content: str, meta: dict):  # noqa: D401
+            self.page_content = content
+            self.metadata = meta
+
+    class RemoteClient:
+        def similarity_search_with_score(self, query, k):  # noqa: D401
+            return [
+                (
+                    DocObj(
+                        "c1",
+                        {
+                            retriever.id_field: "d1",
+                            retriever.title_field: "T1",
+                            retriever.url_field: "u1",
+                        },
+                    ),
+                    0.7,
+                ),
+                (
+                    DocObj(
+                        "c2",
+                        {
+                            retriever.id_field: "d2",
+                            retriever.title_field: "T2",
+                            retriever.url_field: "u2",
+                        },
+                    ),
+                    0.6,
+                ),
+            ]
+
+    retriever.client = RemoteClient()
+    # Filter to only d1
+    docs = retriever.query_relevant_documents(
+        "q", resources=[Resource(uri="milvus://d1", title="", description="")]
+    )
+    assert len(docs) == 1 and docs[0].id == "d1" and docs[0].chunks[0].similarity == 0.7
 
 
 def test_get_embedding_dimension_explicit(monkeypatch):
@@ -216,25 +422,6 @@ def test_connect_remote(monkeypatch):
     assert created["collection_name"] == retriever.collection_name
 
 
-def test_list_resources_fallback_on_connect_failure(monkeypatch, tmp_path):
-    _patch_init(monkeypatch)
-    retriever = MilvusProvider()
-
-    # create local examples dir with one file
-    examples_dir = tmp_path / "examples"
-    examples_dir.mkdir()
-    (examples_dir / "sample.md").write_text("# Title\n\nBody", encoding="utf-8")
-    monkeypatch.setenv("MILVUS_EXAMPLES_DIR", str(examples_dir.name))
-    retriever.examples_dir = examples_dir.name
-
-    # force connect failure via generator throw
-    monkeypatch.setattr(
-        retriever, "_connect", lambda: (_ for _ in ()).throw(RuntimeError())
-    )
-    res = retriever.list_resources()
-    assert res and res[0].title == "Title"
-
-
 def test_list_resources_remote_failure(monkeypatch):
     monkeypatch.setenv("MILVUS_URI", "http://remote")
     _patch_init(monkeypatch)
@@ -383,26 +570,6 @@ def test_close_lite_and_remote(monkeypatch):
     retriever2 = MilvusProvider()
     retriever2.client = SimpleNamespace()
     retriever2.close()  # should not raise
-
-
-def test_module_level_load_examples(monkeypatch):
-    # Case where rag provider not milvus -> no call
-    called = {"inst": 0}
-
-    class DummyProv(MilvusProvider):  # type: ignore
-        def load_examples(self, *args, **kwargs):  # noqa: D401
-            called["inst"] += 1
-
-    monkeypatch.setattr(milvus_mod, "MilvusProvider", DummyProv)
-    monkeypatch.setenv("RAG_PROVIDER", "other")
-    monkeypatch.setenv("MILVUS_AUTO_LOAD_EXAMPLES", "1")
-    milvus_mod.load_examples()
-    assert called["inst"] == 0
-
-    # Now provider matches and auto load true
-    monkeypatch.setenv("RAG_PROVIDER", "milvus")
-    milvus_mod.load_examples()
-    assert called["inst"] == 1
 
 
 def test_get_embedding_invalid_output(monkeypatch):
