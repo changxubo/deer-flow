@@ -579,3 +579,82 @@ def test_get_embedding_invalid_output(monkeypatch):
     retriever.embedding_model.embed_query = lambda text: []  # type: ignore
     with pytest.raises(RuntimeError):
         retriever._get_embedding("text")
+
+
+def test_dashscope_embeddings_embed_query(monkeypatch):
+    calls = {}
+
+    class DummyOpenAI:
+        def __init__(self, api_key, base_url):
+            self.embeddings = self
+            calls["init"] = {"api_key": api_key, "base_url": base_url}
+            calls["create_calls"] = []
+
+        def create(self, model, input, encoding_format):
+            calls["create_calls"].append(
+                {"model": model, "input": input, "encoding_format": encoding_format}
+            )
+            # deterministic embeddings: index -> [index, index+0.1]
+            return SimpleNamespace(
+                data=[
+                    SimpleNamespace(embedding=[float(i), float(i) + 0.1])
+                    for i, _ in enumerate(input)
+                ]
+            )
+
+    monkeypatch.setattr(milvus_mod, "OpenAI", DummyOpenAI)
+    emb = milvus_mod.DashscopeEmbeddings(
+        model="mX", api_key="KEY", base_url="URL", encoding_format="float"
+    )
+    vec = emb.embed_query("hello")
+    assert vec == [0.0, 0.1]
+    assert calls["init"] == {"api_key": "KEY", "base_url": "URL"}
+    assert len(calls["create_calls"]) == 1
+    rec = calls["create_calls"][0]
+    assert rec["model"] == "mX"
+    assert rec["input"] == ["hello"]
+    assert rec["encoding_format"] == "float"
+
+
+def test_dashscope_embeddings_embed_documents_with_type_coercion(monkeypatch):
+    calls = {}
+
+    class DummyOpenAI:
+        def __init__(self, api_key, base_url):
+            self.embeddings = self
+            calls["create_calls"] = []
+
+        def create(self, model, input, encoding_format):
+            calls["create_calls"].append({"model": model, "input": input})
+            return SimpleNamespace(
+                data=[
+                    SimpleNamespace(
+                        embedding=[float(i), float(i) + 0.5, float(i) + 1.0]
+                    )
+                    for i, _ in enumerate(input)
+                ]
+            )
+
+    monkeypatch.setattr(milvus_mod, "OpenAI", DummyOpenAI)
+    emb = milvus_mod.DashscopeEmbeddings(model="modelY")
+    out = emb.embed_documents(["alpha", 123])  # 123 coerced to "123"
+    assert len(out) == 2
+    assert out[0] == [0.0, 0.5, 1.0]
+    assert out[1] == [1.0, 1.5, 2.0]
+    recorded_inputs = calls["create_calls"][0]["input"]
+    assert recorded_inputs == ["alpha", "123"]
+
+
+def test_dashscope_embeddings_empty_inputs_short_circuit(monkeypatch):
+    # Use real class but swap _client to ensure create is never called
+    emb = milvus_mod.DashscopeEmbeddings(model="m")
+
+    class FailingClient:
+        class _Emb:
+            def create(self, *a, **k):
+                raise AssertionError("Should not be called for empty input")
+
+        embeddings = _Emb()
+
+    emb._client = FailingClient()  # type: ignore
+    assert emb.embed_documents([]) == []
