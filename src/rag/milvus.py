@@ -3,65 +3,21 @@
 
 import hashlib
 import logging
-import os
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set
 
 from langchain_milvus.vectorstores import Milvus as LangchainMilvus
-
-try:
-    from pymilvus import MilvusClient, CollectionSchema, FieldSchema, DataType
-except ImportError:
-    raise ImportError(
-        "pymilvus is required for MilvusProvider. Install it with: pip install pymilvus"
-    )
-
-try:
-    from langchain_openai import OpenAIEmbeddings
-    from openai import OpenAI
-
-    EMBEDDINGS_AVAILABLE = True
-except ImportError:
-    EMBEDDINGS_AVAILABLE = False
-
+from pymilvus import MilvusClient, CollectionSchema, FieldSchema, DataType
+from langchain_openai import OpenAIEmbeddings
+from openai import OpenAI
 from src.rag.retriever import Chunk, Document, Resource, Retriever
+from src.config.loader import get_bool_env, get_str_env, get_int_env
 
 logger = logging.getLogger(__name__)
 
 
-def get_bool_env(name: str, default: bool = False) -> bool:
-    val = os.getenv(name)
-    if val is None:
-        return default
-    return str(val).strip().lower() in {"1", "true", "yes", "y", "on"}
-
-
-def get_str_env(name: str, default: str = "") -> str:
-    val = os.getenv(name)
-    return default if val is None else str(val).strip()
-
-
-def get_int_env(name: str, default: int = 0) -> int:
-    val = os.getenv(name)
-    if val is None:
-        return default
-    try:
-        return int(val.strip())
-    except ValueError:
-        logger.warning(
-            f"Invalid integer value for {name}: {val}. Using default {default}."
-        )
-        return default
-
-
 class DashscopeEmbeddings:
-    """Minimal OpenAI-compatible embeddings wrapper.
-
-    Provides the two methods LangChain expects: ``embed_query`` and
-    ``embed_documents``. It delegates to an ``OpenAI``-style client whose
-    ``embeddings.create`` method returns an object whose ``data`` attribute is
-    an iterable of items each exposing an ``embedding`` list.
-    """
+    """OpenAI-compatible embeddings wrapper."""
 
     def __init__(self, **kwargs: Any) -> None:
         self._client: OpenAI = OpenAI(
@@ -71,14 +27,7 @@ class DashscopeEmbeddings:
         self._encoding_format: str = kwargs.get("encoding_format", "float")
 
     def _embed(self, texts: Sequence[str]) -> List[List[float]]:
-        """Internal helper performing the embedding API call.
-
-        Args:
-            texts: Sequence of input strings.
-
-        Returns:
-            A list of embedding vectors (list[float]).
-        """
+        """Internal helper performing the embedding API call."""
         clean_texts = [t if isinstance(t, str) else str(t) for t in texts]
         if not clean_texts:
             return []
@@ -90,14 +39,7 @@ class DashscopeEmbeddings:
         return [d.embedding for d in resp.data]
 
     def embed_query(self, text: str) -> List[float]:
-        """Return a single query embedding.
-
-        Args:
-            text: Query text.
-
-        Returns:
-            Embedding vector for the query (may be empty list on failure).
-        """
+        """Return embedding for a given text."""
         embeddings = self._embed([text])
         return embeddings[0] if embeddings else []
 
@@ -108,12 +50,10 @@ class DashscopeEmbeddings:
 
 class MilvusRetriever(Retriever):
     """Retriever implementation backed by a Milvus vector store.
-
     Responsibilities:
         * Initialize / lazily connect to Milvus (local Lite or remote server).
         * Provide methods for inserting content chunks & querying similarity.
         * Optionally surface example markdown resources found in the project.
-
     Environment variables (selected):
         MILVUS_URI: Connection URI or local *.db path for Milvus Lite.
         MILVUS_COLLECTION: Target collection name (default: documents).
@@ -164,17 +104,7 @@ class MilvusRetriever(Retriever):
         self.client: Any = None
 
     def _init_embedding_model(self) -> None:
-        """Initialize the embedding model based on configuration.
-
-        Raises:
-            ImportError: If embedding dependencies are not installed.
-            ValueError: If the embedding provider value is unsupported.
-        """
-        if not EMBEDDINGS_AVAILABLE:
-            raise ImportError(
-                "Embedding dependencies not available. "
-                "Install with: pip install langchain-openai langchain-community"
-            )
+        """Initialize the embedding model based on configuration."""
         kwargs = {
             "api_key": self.embedding_api_key,
             "model": self.embedding_model,
@@ -193,13 +123,7 @@ class MilvusRetriever(Retriever):
             )
 
     def _get_embedding_dimension(self, model_name: str) -> int:
-        """Return embedding dimension for the supplied model name.
-
-        Priority order:
-            1. Explicit override via MILVUS_EMBEDDING_DIM.
-            2. Known model dimension mapping.
-            3. Fallback default (1536).
-        """
+        """Return embedding dimension for the supplied model name."""
         # Common OpenAI embedding model dimensions
         embedding_dims = {
             "text-embedding-ada-002": 1536,
@@ -210,13 +134,11 @@ class MilvusRetriever(Retriever):
         explicit_dim = get_int_env("MILVUS_EMBEDDING_DIM", 0)
         if explicit_dim > 0:
             return explicit_dim
-
-        # Return dimension based on model name
+        # Return the dimension for the specified model
         return embedding_dims.get(model_name, 1536)  # Default to 1536
 
     def _create_collection_schema(self) -> CollectionSchema:
         """Build and return a Milvus ``CollectionSchema`` object with metadata field.
-
         Attempts to use a JSON field for metadata; falls back to VARCHAR if JSON
         type isn't supported in the deployment.
         """
@@ -249,7 +171,6 @@ class MilvusRetriever(Retriever):
 
     def _ensure_collection_exists(self) -> None:
         """Ensure the configured collection exists (create if missing).
-
         For Milvus Lite we create the collection manually; for the remote
         (LangChain) client we rely on LangChain's internal logic.
         """
@@ -283,7 +204,6 @@ class MilvusRetriever(Retriever):
 
     def _load_example_files(self) -> None:
         """Load example markdown files into the collection (idempotent).
-
         Each markdown file is split into chunks and inserted only if a chunk
         with the derived document id hasn't been previously stored.
         """
@@ -366,14 +286,7 @@ class MilvusRetriever(Retriever):
         return filename.replace(".md", "").replace("_", " ").title()
 
     def _split_content(self, content: str) -> List[str]:
-        """Split long markdown text into paragraph-based chunks.
-
-        Args:
-            content: Raw markdown string.
-
-        Returns:
-            List of chunk strings preserving paragraph boundaries where possible.
-        """
+        """Split long markdown text into paragraph-based chunks."""
         if len(content) <= self.chunk_size:
             return [content]
 
@@ -419,18 +332,7 @@ class MilvusRetriever(Retriever):
     def _insert_document_chunk(
         self, doc_id: str, content: str, title: str, url: str, metadata: Dict[str, Any]
     ) -> None:
-        """Insert a single content chunk into Milvus.
-
-        Args:
-            doc_id: Unique identifier for chunk/document.
-            content: Plain text content to embed.
-            title: Document title.
-            url: Source URL or pseudo-URL.
-            metadata: Additional key/value metadata.
-
-        Raises:
-            RuntimeError: On failure to insert the chunk.
-        """
+        """Insert a single content chunk into Milvus."""
         try:
             # Generate embedding
             embedding = self._get_embedding(content)
@@ -447,7 +349,6 @@ class MilvusRetriever(Retriever):
                         **metadata,  # Add metadata fields
                     }
                 ]
-
                 self.client.insert(collection_name=self.collection_name, data=data)
             else:
                 # For LangChain Milvus, use add_texts
@@ -462,7 +363,6 @@ class MilvusRetriever(Retriever):
                         }
                     ],
                 )
-
         except Exception as e:
             raise RuntimeError(f"Failed to insert document chunk: {str(e)}")
 
@@ -498,7 +398,6 @@ class MilvusRetriever(Retriever):
 
     def _is_milvus_lite(self) -> bool:
         """Return True if the URI points to a local Milvus Lite file.
-
         Milvus Lite uses local file paths (often ``*.db``) without an HTTP/HTTPS
         scheme. We treat any path not containing a protocol and not starting
         with an HTTP(S) prefix as a Lite instance.
@@ -508,17 +407,7 @@ class MilvusRetriever(Retriever):
         )
 
     def _get_embedding(self, text: str) -> List[float]:
-        """Return embedding for a given text.
-
-        Args:
-            text: Input text to embed.
-
-        Returns:
-            Embedding vector as a list of floats.
-
-        Raises:
-            RuntimeError: If the embedding model fails or returns an invalid response.
-        """
+        """Return embedding for a given text."""
         try:
             # Validate input
             if not isinstance(text, str):
@@ -886,6 +775,7 @@ class MilvusProvider(MilvusRetriever):
     """Backward compatible alias for ``MilvusRetriever`` (original name)."""
 
     pass
+
 
 def load_examples() -> None:
     auto_load_examples = get_bool_env("MILVUS_AUTO_LOAD_EXAMPLES", False)

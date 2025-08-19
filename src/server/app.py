@@ -17,7 +17,8 @@ from langgraph.checkpoint.mongodb import AsyncMongoDBSaver
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg_pool import AsyncConnectionPool
 
-from src.config.configuration import get_recursion_limit, get_bool_env, get_str_env
+from src.config.configuration import get_recursion_limit
+from src.config.loader import get_bool_env, get_str_env
 from src.config.report_style import ReportStyle
 from src.config.tools import SELECTED_RAG_PROVIDER
 from src.graph.builder import build_graph_with_memory
