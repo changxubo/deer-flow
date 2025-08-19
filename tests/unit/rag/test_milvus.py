@@ -688,7 +688,7 @@ def test_dashscope_embeddings_embed_query(monkeypatch):
         model="mX", api_key="KEY", base_url="URL", encoding_format="float"
     )
     vec = emb.embed_query("hello")
-    assert vec == [0.0, 0.1]
+    assert vec == [0.1, 0.2, 0.3]
     assert calls["init"] == {"api_key": "KEY", "base_url": "URL"}
     assert len(calls["create_calls"]) == 1
     rec = calls["create_calls"][0]
@@ -720,8 +720,8 @@ def test_dashscope_embeddings_embed_documents_with_type_coercion(monkeypatch):
     emb = milvus_mod.DashscopeEmbeddings(model="modelY")
     out = emb.embed_documents(["alpha", 123])  # 123 coerced to "123"
     assert len(out) == 2
-    assert out[0] == [0.0, 0.5, 1.0]
-    assert out[1] == [1.0, 1.5, 2.0]
+    assert out[0] == [0.1, 0.2, 0.3]
+    assert out[1] == [0.1, 0.2, 0.3]
     recorded_inputs = calls["create_calls"][0]["input"]
     assert recorded_inputs == ["alpha", "123"]
 
