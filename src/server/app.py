@@ -558,6 +558,7 @@ async def mcp_server_metadata(request: MCPServerMetadataRequest):
             args=request.args,
             url=request.url,
             env=request.env,
+            headers=request.headers,
             timeout_seconds=timeout,
         )
 
@@ -568,6 +569,7 @@ async def mcp_server_metadata(request: MCPServerMetadataRequest):
             args=request.args,
             url=request.url,
             env=request.env,
+            headers=request.headers,
             tools=tools,
         )
 
