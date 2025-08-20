@@ -73,20 +73,19 @@ def background_investigation_node(state: State, config: RunnableConfig):
             logger.error(
                 f"Tavily search returned malformed response: {searched_content}"
             )
-            return {"background_investigation_results": f"{searched_content}"}
     else:
         background_investigation_results = get_web_search_tool(
             configurable.max_search_results
         ).invoke(query)
-        results = json.dumps(background_investigation_results, ensure_ascii=False)
-        # Build checkpoint with the background investigation results
-        log_graph_event(
-            configurable.thread_id,
-            "background_investigator",
-            "info",
-            {"goto": "planner", "investigations": results},
-        )
-        return {"background_investigation_results": results}
+    results = json.dumps(background_investigation_results, ensure_ascii=False)
+    # Build checkpoint with the background investigation results
+    log_graph_event(
+        configurable.thread_id,
+        "background_investigator",
+        "info",
+        {"goto": "planner", "investigations": results},
+    )
+    return {"background_investigation_results": results}
 
 
 def planner_node(
@@ -453,18 +452,10 @@ async def _execute_agent_step(
     # Build checkpoint with the current plan
     agent_input_messages = []
     for message in agent_input["messages"]:
-        if isinstance(message, HumanMessage):
+        if isinstance(message, tuple):
             agent_input_messages.append(
                 {
-                    "role": "user",
-                    "content": message.content,
-                    "name": message.name,
-                }
-            )
-        elif isinstance(message, AIMessage):
-            agent_input_messages.append(
-                {
-                    "role": "assistant",
+                    "role": message.type,
                     "content": message.content,
                     "name": message.name,
                 }
