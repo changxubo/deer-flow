@@ -51,11 +51,13 @@ def mock_config():
     # 你可以根据实际需要返回一个 MagicMock 或 dict
     return MagicMock()
 
+
 @pytest.fixture
 def mock_config_thread():
     mock = MagicMock()
     mock.thread_id = "_default_"
     return mock
+
 
 @pytest.fixture
 def patch_config_from_runnable_config(mock_configurable):
@@ -421,7 +423,9 @@ def mock_state_base():
     }
 
 
-def test_human_feedback_node_auto_accepted(monkeypatch, mock_state_base, mock_config_thread):
+def test_human_feedback_node_auto_accepted(
+    monkeypatch, mock_state_base, mock_config_thread
+):
     # auto_accepted_plan True, should skip interrupt and parse plan
     state = dict(mock_state_base)
     state["auto_accepted_plan"] = True
@@ -432,12 +436,14 @@ def test_human_feedback_node_auto_accepted(monkeypatch, mock_state_base, mock_co
     assert result.update["current_plan"]["has_enough_context"] is False
 
 
-def test_human_feedback_node_edit_plan(monkeypatch, mock_state_base,mock_config_thread):
+def test_human_feedback_node_edit_plan(
+    monkeypatch, mock_state_base, mock_config_thread
+):
     # interrupt returns [EDIT_PLAN]..., should return Command to planner
     state = dict(mock_state_base)
     state["auto_accepted_plan"] = False
     with patch("src.graph.nodes.interrupt", return_value="[EDIT_PLAN] Please revise"):
-        result = human_feedback_node(state,mock_config_thread)
+        result = human_feedback_node(state, mock_config_thread)
         assert isinstance(result, Command)
         assert result.goto == "planner"
         assert result.update["messages"][0].name == "feedback"
@@ -456,7 +462,9 @@ def test_human_feedback_node_accepted(monkeypatch, mock_state_base, mock_config_
         assert result.update["current_plan"]["has_enough_context"] is False
 
 
-def test_human_feedback_node_invalid_interrupt(monkeypatch, mock_state_base, mock_config_thread):
+def test_human_feedback_node_invalid_interrupt(
+    monkeypatch, mock_state_base, mock_config_thread
+):
     # interrupt returns something else, should raise TypeError
     state = dict(mock_state_base)
     state["auto_accepted_plan"] = False
@@ -495,7 +503,9 @@ def test_human_feedback_node_json_decode_error_second_iteration(
         assert result.goto == "reporter"
 
 
-def test_human_feedback_node_not_enough_context(monkeypatch, mock_state_base, mock_config_thread):
+def test_human_feedback_node_not_enough_context(
+    monkeypatch, mock_state_base, mock_config_thread
+):
     # Plan does not have enough context, should goto research_team
     plan = {
         "has_enough_context": False,
@@ -907,6 +917,7 @@ def mock_agent():
 
     agent.ainvoke = ainvoke
     return agent
+
 
 @pytest.mark.asyncio
 async def test_execute_agent_step_basic(
