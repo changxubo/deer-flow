@@ -1,4 +1,5 @@
-import { MessageSquareReply, Play } from "lucide-react";
+import { VerticalAlignBottomOutlined } from "@ant-design/icons";
+import { MessageSquareReply, Play, FileText, Newspaper, Users, GraduationCap, CircleCheck, CircleX, CircleAlert, Ellipsis } from "lucide-react";
 import { useState } from "react";
 
 import { LoadingAnimation } from "~/components/deer-flow/loading-animation";
@@ -80,18 +81,44 @@ export function ConversationsDialog() {
                                 )}
                             >
                                 <div className="flex items-center justify-between">
+                                    <div className="pl-4">
+                                        {
+                                            result.category === "social_media" ? (
+                                                <FileText size={32} />
+                                            ) : result.category === "news" ? (
+                                                <Newspaper size={32} />
+                                            ) : result.category === "academic" ? (
+                                                <GraduationCap size={32} />
+                                            ) : result.category === "popular_science" ? (
+                                                <Users size={32} />
+                                            ) : (
+                                                <Users size={32} />
+                                            )
+                                        }
+                                    </div>
                                     <div className="flex flex-grow items-center">
 
                                         <CardHeader className={cn("flex-grow pl-3")}>
                                             <CardTitle>
-                                                <RainbowText animated={false}>
+                                                <RainbowText animated={false} className="text-lg inline-block">
                                                     {`${result.title}`}
                                                 </RainbowText>
                                             </CardTitle>
                                             <CardDescription>
-                                                <RainbowText animated={false}>
+                                                <RainbowText animated={false} className="text-lg inline-block h-[30px]">
                                                     {`${result.date.substring(0, 19).replace(/-/g, "/").replace("T", " ")} | ${result.category} | ${result.count} messages`}
                                                 </RainbowText>
+                                                {
+                                                    result.count === 0 ? (
+                                                        <CircleX size={24} className="text-red-500 inline-block ml-2" />
+                                                    ) : result.count > 800 ? (
+                                                        <CircleCheck size={24} className="text-green-500 inline-block ml-2" />
+                                                    ) : result.count < 800 && result.count > 100 ? (
+                                                        <CircleAlert size={24} className="text-yellow-500 inline-block ml-2" />
+                                                    ) : (
+                                                        <Ellipsis size={32} className="text-gray-500 inline-block ml-2" />
+                                                    )
+                                                }
                                             </CardDescription>
                                         </CardHeader>
                                     </div>
