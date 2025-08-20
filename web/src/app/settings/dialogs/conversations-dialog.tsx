@@ -98,10 +98,9 @@ export function ConversationsDialog() {
                                     <div className="pr-4">
                                         <Button className="w-24" onClick={() => {
                                             // Handle replay start logic here
-                                            console.log(`Starting replay for: ${result.id}`);
                                             setOpen(false);
                                             // redirect to replay page or start replay session
-                                            location.href = `${result.data_type === "txt" ? `/chat?replay=${result.id}` : "/chat?thread_id=${result.id}"}`;
+                                            location.href = `${result.data_type === "txt" ? `/chat?replay=${result.id}` : `/chat?thread_id=${result.id}`}`;
 
                                         }}>
                                             <Play size={16} />

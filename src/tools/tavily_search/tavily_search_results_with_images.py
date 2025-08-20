@@ -3,7 +3,7 @@
 
 import json
 import logging
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Literal, Optional, Tuple, Union
 
 from langchain.callbacks.manager import (
     AsyncCallbackManagerForToolRun,
@@ -109,6 +109,15 @@ class TavilySearchWithImages(TavilySearch):  # type: ignore[override, override]
     def _run(
         self,
         query: str,
+        include_domains: Optional[List[str]] = None,
+        exclude_domains: Optional[List[str]] = None,
+        search_depth: Optional[Literal["basic", "advanced"]] = "basic",
+        include_images: Optional[bool] = True,
+        time_range: Optional[Literal["day", "week", "month", "year"]] = None,
+        topic: Optional[Literal["general", "news", "finance"]] = None,
+        include_favicon: Optional[bool] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
         run_manager: Optional[CallbackManagerForToolRun] = None,
     ) -> Tuple[Union[List[Dict[str, str]], str], Dict]:
         """Use the tool."""
@@ -116,14 +125,22 @@ class TavilySearchWithImages(TavilySearch):  # type: ignore[override, override]
         try:
             raw_results = self.api_wrapper.raw_results(
                 query,
-                self.max_results,
-                self.search_depth,
-                self.include_domains,
-                self.exclude_domains,
-                self.include_answer,
-                self.include_raw_content,
-                self.include_images,
-                self.include_image_descriptions,
+                max_results=self.max_results,
+                search_depth=search_depth if search_depth else self.search_depth,
+                include_domains=(
+                    include_domains if include_domains else self.include_domains
+                ),
+                exclude_domains=(
+                    exclude_domains if exclude_domains else self.exclude_domains
+                ),
+                include_answer=self.include_answer,
+                include_raw_content=self.include_raw_content,
+                include_images=(
+                    include_images
+                    if include_images is not None
+                    else self.include_images
+                ),
+                include_image_descriptions=self.include_image_descriptions,
             )
         except Exception as e:
             return repr(e), {}
@@ -136,20 +153,37 @@ class TavilySearchWithImages(TavilySearch):  # type: ignore[override, override]
     async def _arun(
         self,
         query: str,
+        include_domains: Optional[List[str]] = None,
+        exclude_domains: Optional[List[str]] = None,
+        search_depth: Optional[Literal["basic", "advanced"]] = "basic",
+        include_images: Optional[bool] = True,
+        time_range: Optional[Literal["day", "week", "month", "year"]] = None,
+        topic: Optional[Literal["general", "news", "finance"]] = None,
+        include_favicon: Optional[bool] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
         run_manager: Optional[AsyncCallbackManagerForToolRun] = None,
     ) -> Tuple[Union[List[Dict[str, str]], str], Dict]:
         """Use the tool asynchronously."""
         try:
             raw_results = await self.api_wrapper.raw_results_async(
                 query,
-                self.max_results,
-                self.search_depth,
-                self.include_domains,
-                self.exclude_domains,
-                self.include_answer,
-                self.include_raw_content,
-                self.include_images,
-                self.include_image_descriptions,
+                max_results=self.max_results,
+                search_depth=search_depth if search_depth else self.search_depth,
+                include_domains=(
+                    include_domains if include_domains else self.include_domains
+                ),
+                exclude_domains=(
+                    exclude_domains if exclude_domains else self.exclude_domains
+                ),
+                include_answer=self.include_answer,
+                include_raw_content=self.include_raw_content,
+                include_images=(
+                    include_images
+                    if include_images is not None
+                    else self.include_images
+                ),
+                include_image_descriptions=self.include_image_descriptions,
             )
         except Exception as e:
             return repr(e), {}
