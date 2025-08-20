@@ -136,7 +136,7 @@ def test_background_investigation_node_malformed_response(
         result = background_investigation_node(mock_state, mock_config)
 
         # Verify the result structure
-        assert result is None or isinstance(result, dict)
+        assert isinstance(result, dict)
 
         # Verify the update contains background_investigation_results
         assert "background_investigation_results" in result

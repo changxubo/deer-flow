@@ -57,7 +57,8 @@ def background_investigation_node(state: State, config: RunnableConfig):
 
         if isinstance(searched_content, list):
             background_investigation_results = [
-                f"## {elem['title']}\n\n{elem['content'] }" for elem in searched_content #if elem.get("type") == "page"
+                f"## {elem['title']}\n\n{elem['content'] }"
+                for elem in searched_content  # if elem.get("type") == "page"
             ]
             results = "\n\n".join(background_investigation_results)
             # Build checkpoint with the background investigation results
@@ -85,6 +86,7 @@ def background_investigation_node(state: State, config: RunnableConfig):
             {"goto": "planner", "investigations": results},
         )
         return {"background_investigation_results": results}
+    return {"background_investigation_results": []}
 
 
 def planner_node(
