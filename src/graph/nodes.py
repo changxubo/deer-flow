@@ -28,6 +28,7 @@ from src.tools.search import LoggedTavilySearch
 from src.utils.json_utils import repair_json_output
 
 from ..config import SELECTED_SEARCH_ENGINE, SearchEngine
+from .checkpoint import log_research_replays, log_graph_event
 from .types import State
 
 logger = logging.getLogger(__name__)
@@ -245,6 +246,18 @@ def coordinator_node(
     messages = state.get("messages", [])
     if response.content:
         messages.append(HumanMessage(content=response.content, name="coordinator"))
+
+    # Build checkpoint with the current plan
+    log_research_replays(
+        configurable.thread_id, research_topic, configurable.report_style, 0
+    )
+    log_graph_event(
+        configurable.thread_id,
+        "coordinator",
+        "info",
+        {"goto": goto, "research_topic": research_topic},
+    )
+
     return Command(
         update={
             "messages": messages,

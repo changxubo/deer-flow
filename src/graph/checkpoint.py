@@ -5,7 +5,7 @@ import json
 import logging
 import uuid
 from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, cast
 import psycopg
 from psycopg.rows import dict_row
 from pymongo import MongoClient
@@ -84,6 +84,8 @@ class ChatStreamManager:
             self.postgres_conn = psycopg.connect(self.db_uri, row_factory=dict_row)
             self.logger.info("Successfully connected to PostgreSQL")
             self._create_chat_streams_table()
+            self._create_langgraph_events_table()
+            self._create_research_replays_table()
         except Exception as e:
             self.logger.error(f"Failed to connect to PostgreSQL: {e}")
 
@@ -131,30 +133,6 @@ class ChatStreamManager:
                 self.logger.info("Langgraph events table created/verified successfully")
         except Exception as e:
             self.logger.error(f"Failed to create langgraph_events table: {e}")
-            if self.postgres_conn:
-                self.postgres_conn.rollback()
-
-    def _create_chat_streams_table(self) -> None:
-        """Create the chat_streams table if it doesn't exist."""
-        try:
-            with self.postgres_conn.cursor() as cursor:
-                create_table_sql = """
-                CREATE TABLE IF NOT EXISTS chat_streams (
-                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                    thread_id VARCHAR(255) NOT NULL UNIQUE,
-                    messages JSONB NOT NULL,
-                    ts TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-                );
-                
-                CREATE INDEX IF NOT EXISTS idx_chat_streams_thread_id ON chat_streams(thread_id);
-                CREATE INDEX IF NOT EXISTS idx_chat_streams_ts ON chat_streams(ts);
-                
-                """
-                cursor.execute(create_table_sql)
-                self.postgres_conn.commit()
-                self.logger.info("Chat streams table created/verified successfully")
-        except Exception as e:
-            self.logger.error(f"Failed to create chat_streams table: {e}")
             if self.postgres_conn:
                 self.postgres_conn.rollback()
 
@@ -543,7 +521,8 @@ class ChatStreamManager:
             if not self.checkpoint_saver:
                 self.logger.warning("Checkpoint saver is disabled")
                 return False
-
+            # Log the event of persisting conversation
+            self.log_research_replays(thread_id, "", "", len(messages))
             # Choose persistence method based on available connection
             if self.mongo_db is not None:
                 return self._persist_to_mongodb(thread_id, messages)
