@@ -4,7 +4,7 @@
 import json
 import logging
 import os
-from typing import Annotated, Literal
+from typing import Annotated, Literal, cast
 
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
@@ -54,9 +54,10 @@ def background_investigation_node(state: State, config: RunnableConfig):
         searched_content = LoggedTavilySearch(
             max_results=configurable.max_search_results
         ).invoke(query)
+
         if isinstance(searched_content, list):
             background_investigation_results = [
-                f"## {elem['title']}\n\n{elem['content']}" for elem in searched_content
+                f"## {elem['title']}\n\n{elem['content'] }" for elem in searched_content if elem.get("type") == "page"
             ]
             results = "\n\n".join(background_investigation_results)
             # Build checkpoint with the background investigation results
@@ -75,15 +76,15 @@ def background_investigation_node(state: State, config: RunnableConfig):
         background_investigation_results = get_web_search_tool(
             configurable.max_search_results
         ).invoke(query)
-    results = json.dumps(background_investigation_results, ensure_ascii=False)
-    # Build checkpoint with the background investigation results
-    log_graph_event(
-        configurable.thread_id,
-        "background_investigator",
-        "info",
-        {"goto": "planner", "investigations": results},
-    )
-    return {"background_investigation_results": results}
+        results = json.dumps(background_investigation_results, ensure_ascii=False)
+        # Build checkpoint with the background investigation results
+        log_graph_event(
+            configurable.thread_id,
+            "background_investigator",
+            "info",
+            {"goto": "planner", "investigations": results},
+        )
+        return {"background_investigation_results": results}
 
 
 def planner_node(

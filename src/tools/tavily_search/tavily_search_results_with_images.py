@@ -119,7 +119,7 @@ class TavilySearchWithImages(TavilySearch):  # type: ignore[override, override]
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         run_manager: Optional[CallbackManagerForToolRun] = None,
-    ) -> Tuple[Union[List[Dict[str, str]], str], Dict]:
+    ) -> List[Dict]:
         """Use the tool."""
         # TODO: remove try/except, should be handled by BaseTool
         try:
@@ -148,7 +148,7 @@ class TavilySearchWithImages(TavilySearch):  # type: ignore[override, override]
         logger.debug(
             "sync: %s", json.dumps(cleaned_results, indent=2, ensure_ascii=False)
         )
-        return cleaned_results, raw_results
+        return cleaned_results
 
     async def _arun(
         self,
@@ -163,7 +163,7 @@ class TavilySearchWithImages(TavilySearch):  # type: ignore[override, override]
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         run_manager: Optional[AsyncCallbackManagerForToolRun] = None,
-    ) -> Tuple[Union[List[Dict[str, str]], str], Dict]:
+    ) -> List[Dict]:
         """Use the tool asynchronously."""
         try:
             raw_results = await self.api_wrapper.raw_results_async(
@@ -191,4 +191,4 @@ class TavilySearchWithImages(TavilySearch):  # type: ignore[override, override]
         logger.debug(
             "async: %s", json.dumps(cleaned_results, indent=2, ensure_ascii=False)
         )
-        return cleaned_results, raw_results
+        return cleaned_results
