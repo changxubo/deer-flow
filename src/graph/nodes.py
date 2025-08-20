@@ -71,19 +71,20 @@ def background_investigation_node(state: State, config: RunnableConfig):
             logger.error(
                 f"Tavily search returned malformed response: {searched_content}"
             )
+            return {"background_investigation_results": []}
     else:
         background_investigation_results = get_web_search_tool(
             configurable.max_search_results
         ).invoke(query)
-    results = json.dumps(background_investigation_results, ensure_ascii=False)
-    # Build checkpoint with the background investigation results
-    log_graph_event(
-        configurable.thread_id,
-        "background_investigator",
-        "info",
-        {"goto": "planner", "investigations": results},
-    )
-    return {"background_investigation_results": results}
+        results = json.dumps(background_investigation_results, ensure_ascii=False)
+        # Build checkpoint with the background investigation results
+        log_graph_event(
+            configurable.thread_id,
+            "background_investigator",
+            "info",
+            {"goto": "planner", "investigations": results},
+        )
+        return {"background_investigation_results": results}
 
 
 def planner_node(
