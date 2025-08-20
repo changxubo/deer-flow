@@ -904,15 +904,24 @@ def mock_agent():
     return agent
 
 
+@pytest.fixture
+def mock_config_thread():
+    mock = MagicMock()
+    mock.thread_id = "_default_"
+    return mock
+
+
 @pytest.mark.asyncio
-async def test_execute_agent_step_basic(mock_state_with_steps, mock_agent):
+async def test_execute_agent_step_basic(
+    mock_state_with_steps, mock_agent, mock_config_thread
+):
     # Should execute the first unexecuted step and update execution_res
     with patch(
         "src.graph.nodes.HumanMessage",
         side_effect=lambda content, name=None: MagicMock(content=content, name=name),
     ):
         result = await _execute_agent_step(
-            mock_state_with_steps, mock_agent, "researcher"
+            mock_state_with_steps, mock_config_thread, mock_agent, "researcher"
         )
         assert isinstance(result, Command)
         assert result.goto == "research_team"
@@ -929,12 +938,12 @@ async def test_execute_agent_step_basic(mock_state_with_steps, mock_agent):
 
 @pytest.mark.asyncio
 async def test_execute_agent_step_no_unexecuted_step(
-    mock_state_no_unexecuted, mock_agent
+    mock_state_no_unexecuted, mock_agent, mock_config_thread
 ):
     # Should return Command with goto="research_team" and not fail
     with patch("src.graph.nodes.logger") as mock_logger:
         result = await _execute_agent_step(
-            mock_state_no_unexecuted, mock_agent, "researcher"
+            mock_state_no_unexecuted, mock_config_thread, mock_agent, "researcher"
         )
         assert isinstance(result, Command)
         assert result.goto == "research_team"
@@ -942,7 +951,9 @@ async def test_execute_agent_step_no_unexecuted_step(
 
 
 @pytest.mark.asyncio
-async def test_execute_agent_step_with_resources_and_researcher(mock_step):
+async def test_execute_agent_step_with_resources_and_researcher(
+    mock_step, mock_config_thread
+):
     # Should add resource info and citation reminder for researcher
     Resource = namedtuple("Resource", ["title", "description"])
     resources = [Resource(title="file1.txt", description="desc1")]
@@ -968,7 +979,9 @@ async def test_execute_agent_step_with_resources_and_researcher(mock_step):
         "src.graph.nodes.HumanMessage",
         side_effect=lambda content, name=None: MagicMock(content=content, name=name),
     ):
-        result = await _execute_agent_step(state, agent, "researcher")
+        result = await _execute_agent_step(
+            state, mock_config_thread, agent, "researcher"
+        )
         assert isinstance(result, Command)
         assert result.goto == "research_team"
         assert result.update["observations"][-1] == "resource result"
@@ -976,7 +989,7 @@ async def test_execute_agent_step_with_resources_and_researcher(mock_step):
 
 @pytest.mark.asyncio
 async def test_execute_agent_step_recursion_limit_env(
-    monkeypatch, mock_state_with_steps, mock_agent
+    monkeypatch, mock_state_with_steps, mock_agent, mock_config_thread
 ):
     # Should respect AGENT_RECURSION_LIMIT env variable if set and valid
     monkeypatch.setenv("AGENT_RECURSION_LIMIT", "42")
@@ -989,14 +1002,16 @@ async def test_execute_agent_step_recursion_limit_env(
             ),
         ),
     ):
-        result = await _execute_agent_step(mock_state_with_steps, mock_agent, "coder")
+        result = await _execute_agent_step(
+            mock_state_with_steps, mock_config_thread, mock_agent, "coder"
+        )
         assert isinstance(result, Command)
         mock_logger.info.assert_any_call("Recursion limit set to: 42")
 
 
 @pytest.mark.asyncio
 async def test_execute_agent_step_recursion_limit_env_invalid(
-    monkeypatch, mock_state_with_steps, mock_agent
+    monkeypatch, mock_state_with_steps, mock_agent, mock_config_thread
 ):
     # Should fallback to default if env variable is invalid
     monkeypatch.setenv("AGENT_RECURSION_LIMIT", "notanint")
@@ -1009,7 +1024,9 @@ async def test_execute_agent_step_recursion_limit_env_invalid(
             ),
         ),
     ):
-        result = await _execute_agent_step(mock_state_with_steps, mock_agent, "coder")
+        result = await _execute_agent_step(
+            mock_state_with_steps, mock_config_thread, mock_agent, "coder"
+        )
         assert isinstance(result, Command)
         mock_logger.warning.assert_any_call(
             "Invalid AGENT_RECURSION_LIMIT value: 'notanint'. Using default value 25."
@@ -1018,7 +1035,7 @@ async def test_execute_agent_step_recursion_limit_env_invalid(
 
 @pytest.mark.asyncio
 async def test_execute_agent_step_recursion_limit_env_negative(
-    monkeypatch, mock_state_with_steps, mock_agent
+    monkeypatch, mock_state_with_steps, mock_agent, mock_config_thread
 ):
     # Should fallback to default if env variable is negative or zero
     monkeypatch.setenv("AGENT_RECURSION_LIMIT", "-5")
@@ -1031,7 +1048,9 @@ async def test_execute_agent_step_recursion_limit_env_negative(
             ),
         ),
     ):
-        result = await _execute_agent_step(mock_state_with_steps, mock_agent, "coder")
+        result = await _execute_agent_step(
+            mock_state_with_steps, mock_config_thread, mock_agent, "coder"
+        )
         assert isinstance(result, Command)
         mock_logger.warning.assert_any_call(
             "AGENT_RECURSION_LIMIT value '-5' (parsed as -5) is not positive. Using default value 25."

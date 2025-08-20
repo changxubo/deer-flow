@@ -86,10 +86,9 @@ class TestTavilySearchWithImages:
         mock_api_wrapper.raw_results.return_value = sample_raw_results
         mock_api_wrapper.clean_results_with_images.return_value = sample_cleaned_results
 
-        result, raw = search_tool._run("test query")
+        result = search_tool._run("test query")
 
         assert result == sample_cleaned_results
-        assert raw == sample_raw_results
 
         mock_api_wrapper.raw_results.assert_called_once_with(
             "test query",
@@ -129,10 +128,9 @@ class TestTavilySearchWithImages:
         mock_api_wrapper.raw_results_async = AsyncMock(return_value=sample_raw_results)
         mock_api_wrapper.clean_results_with_images.return_value = sample_cleaned_results
 
-        result, raw = await search_tool._arun("test query")
+        result = await search_tool._arun("test query")
 
         assert result == sample_cleaned_results
-        assert raw == sample_raw_results
 
         mock_api_wrapper.raw_results_async.assert_called_once_with(
             "test query",
@@ -157,10 +155,10 @@ class TestTavilySearchWithImages:
             side_effect=Exception("Async API Error")
         )
 
-        result, raw = await search_tool._arun("test query")
+        result = await search_tool._arun("test query")
 
         assert "Async API Error" in result
-        assert raw == {}
+
         mock_api_wrapper.clean_results_with_images.assert_not_called()
 
     def test_run_with_run_manager(
@@ -175,10 +173,9 @@ class TestTavilySearchWithImages:
         mock_api_wrapper.raw_results.return_value = sample_raw_results
         mock_api_wrapper.clean_results_with_images.return_value = sample_cleaned_results
 
-        result, raw = search_tool._run("test query", run_manager=mock_run_manager)
+        result = search_tool._run("test query", run_manager=mock_run_manager)
 
         assert result == sample_cleaned_results
-        assert raw == sample_raw_results
 
     @pytest.mark.asyncio
     async def test_arun_with_run_manager(
@@ -193,9 +190,6 @@ class TestTavilySearchWithImages:
         mock_api_wrapper.raw_results_async = AsyncMock(return_value=sample_raw_results)
         mock_api_wrapper.clean_results_with_images.return_value = sample_cleaned_results
 
-        result, raw = await search_tool._arun(
-            "test query", run_manager=mock_run_manager
-        )
+        result = await search_tool._arun("test query", run_manager=mock_run_manager)
 
         assert result == sample_cleaned_results
-        assert raw == sample_raw_results
