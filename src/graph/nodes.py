@@ -87,7 +87,6 @@ def background_investigation_node(state: State, config: RunnableConfig):
             {"goto": "planner", "investigations": results},
         )
         return {"background_investigation_results": results}
-    return {"background_investigation_results": []}
 
 
 def planner_node(
