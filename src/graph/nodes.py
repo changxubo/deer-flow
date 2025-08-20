@@ -73,7 +73,7 @@ def background_investigation_node(state: State, config: RunnableConfig):
             logger.error(
                 f"Tavily search returned malformed response: {searched_content}"
             )
-            return {"background_investigation_results": []}
+            return {"background_investigation_results": f"{searched_content}"}
     else:
         background_investigation_results = get_web_search_tool(
             configurable.max_search_results
