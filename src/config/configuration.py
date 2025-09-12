@@ -1,6 +1,7 @@
 # Copyright (c) 2025 Bytedance Ltd. and/or its affiliates
 # SPDX-License-Identifier: MIT
 
+import logging
 import os
 from dataclasses import dataclass, field, fields
 from typing import Any, Optional
@@ -10,6 +11,8 @@ from langchain_core.runnables import RunnableConfig
 from src.config.report_style import ReportStyle
 from src.rag.retriever import Resource
 from src.config.loader import get_str_env, get_int_env, get_bool_env
+
+logger = logging.getLogger(__name__)
 
 
 def get_recursion_limit(default: int = 25) -> int:
@@ -25,10 +28,10 @@ def get_recursion_limit(default: int = 25) -> int:
     parsed_limit = get_int_env("AGENT_RECURSION_LIMIT", default)
 
     if parsed_limit > 0:
-        print(f"Recursion limit set to: {parsed_limit}")
+        logger.info(f"Recursion limit set to: {parsed_limit}")
         return parsed_limit
     else:
-        print(
+        logger.warning(
             f"AGENT_RECURSION_LIMIT value '{env_value_str}' (parsed as {parsed_limit}) is not positive. "
             f"Using default value {default}."
         )
