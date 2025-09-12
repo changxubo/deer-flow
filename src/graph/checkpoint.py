@@ -684,7 +684,6 @@ def chat_stream_message(thread_id: str, message: str, finish_reason: str) -> boo
             thread_id, message, finish_reason
         )
     else:
-        logging.warning("Checkpoint saver is disabled, message not processed")
         return False
 
 
