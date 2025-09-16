@@ -22,8 +22,11 @@ SELECTED_SEARCH_ENGINE = os.getenv("SEARCH_API", SearchEngine.TAVILY.value)
 
 
 class RAGProvider(enum.Enum):
+    DIFY = "dify"
     RAGFLOW = "ragflow"
     VIKINGDB_KNOWLEDGE_BASE = "vikingdb_knowledge_base"
+    MOI = "moi"
+    MILVUS = "milvus"
 
 
 SELECTED_RAG_PROVIDER = os.getenv("RAG_PROVIDER")

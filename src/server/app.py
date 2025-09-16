@@ -4,29 +4,32 @@
 import base64
 import json
 import logging
-from typing import Annotated, List, cast
+from typing import Annotated, Any, List, cast
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 from langchain_core.messages import AIMessageChunk, BaseMessage, ToolMessage
-from langgraph.types import Command
-from langgraph.store.memory import InMemoryStore
 from langgraph.checkpoint.mongodb import AsyncMongoDBSaver
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.store.memory import InMemoryStore
+from langgraph.types import Command
 from psycopg_pool import AsyncConnectionPool
 
-from src.config.configuration import get_recursion_limit, get_bool_env, get_str_env
+from src.config.configuration import get_recursion_limit
+from src.config.loader import get_bool_env, get_str_env
 from src.config.report_style import ReportStyle
 from src.config.tools import SELECTED_RAG_PROVIDER
 from src.graph.builder import build_graph_with_memory
+from src.graph.checkpoint import chat_stream_message
 from src.llms.llm import get_configured_llm_models
 from src.podcast.graph.builder import build_graph as build_podcast_graph
 from src.ppt.graph.builder import build_graph as build_ppt_graph
 from src.prompt_enhancer.graph.builder import build_graph as build_prompt_enhancer_graph
 from src.prose.graph.builder import build_graph as build_prose_graph
 from src.rag.builder import build_retriever
+from src.rag.milvus import load_examples
 from src.rag.retriever import Resource
 from src.server.chat_request import (
     ChatRequest,
@@ -44,8 +47,19 @@ from src.server.rag_request import (
     RAGResourceRequest,
     RAGResourcesResponse,
 )
+from src.server.conversation_request import (
+    Conversation,
+    ConversationsRequest,
+    ConversationsResponse,
+)
 from src.tools import VolcengineTTS
-from src.graph.checkpoint import chat_stream_message
+
+from src.graph.checkpoint import (
+    chat_stream_message,
+    get_conversation,
+    list_conversations,
+)
+
 from src.utils.json_utils import sanitize_args
 
 logger = logging.getLogger(__name__)
@@ -73,6 +87,10 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],  # Use the configured list of methods
     allow_headers=["*"],  # Now allow all headers, but can be restricted further
 )
+
+# Load examples into Milvus if configured
+load_examples()
+
 in_memory_store = InMemoryStore()
 graph = build_graph_with_memory()
 
@@ -219,7 +237,6 @@ async def _process_message_chunk(message_chunk, message_metadata, thread_id, age
         if message_chunk.tool_calls:
             # AI Message - Tool Call
             event_stream_message["tool_calls"] = message_chunk.tool_calls
-            event_stream_message["tool_call_chunks"] = message_chunk.tool_call_chunks
             event_stream_message["tool_call_chunks"] = _process_tool_call_chunks(
                 message_chunk.tool_call_chunks
             )
@@ -239,25 +256,36 @@ async def _stream_graph_events(
     graph_instance, workflow_input, workflow_config, thread_id
 ):
     """Stream events from the graph and process them."""
-    async for agent, _, event_data in graph_instance.astream(
-        workflow_input,
-        config=workflow_config,
-        stream_mode=["messages", "updates"],
-        subgraphs=True,
-    ):
-        if isinstance(event_data, dict):
-            if "__interrupt__" in event_data:
-                yield _create_interrupt_event(thread_id, event_data)
-            continue
+    try:
+        async for agent, _, event_data in graph_instance.astream(
+            workflow_input,
+            config=workflow_config,
+            stream_mode=["messages", "updates"],
+            subgraphs=True,
+        ):
+            if isinstance(event_data, dict):
+                if "__interrupt__" in event_data:
+                    yield _create_interrupt_event(thread_id, event_data)
+                continue
 
-        message_chunk, message_metadata = cast(
-            tuple[BaseMessage, dict[str, any]], event_data
+            message_chunk, message_metadata = cast(
+                tuple[BaseMessage, dict[str, Any]], event_data
+            )
+
+            async for event in _process_message_chunk(
+                message_chunk, message_metadata, thread_id, agent
+            ):
+                yield event
+    except Exception as e:
+        logger.exception("Error during graph execution")
+        yield _make_event(
+            "error",
+            {
+                "thread_id": thread_id,
+                "error": "Error during graph execution",
+            },
         )
 
-        async for event in _process_message_chunk(
-            message_chunk, message_metadata, thread_id, agent
-        ):
-            yield event
 
 
 async def _astream_workflow_generator(
@@ -595,3 +623,48 @@ async def config():
         rag=RAGConfigResponse(provider=SELECTED_RAG_PROVIDER),
         models=get_configured_llm_models(),
     )
+
+
+@app.get("/api/conversation/{thread_id}", response_model=str)
+async def get_converstation(thread_id: str) -> Response:
+    """Get the Conversation content for a specific thread ID."""
+    try:
+        content = get_conversation(thread_id)
+        if not content:
+            raise HTTPException(status_code=404, detail="Converstation not found")
+
+        return Response(
+            content=content,
+            media_type="text/plain",
+            headers={"Content-Type": "text/plain; charset=utf-8"},
+        )
+
+    except Exception as e:
+        logger.exception(f"Error getting Converstation: {str(e)}")
+        raise HTTPException(status_code=500, detail=INTERNAL_SERVER_ERROR_DETAIL)
+
+
+@app.get("/api/conversations", response_model=ConversationsResponse)
+async def get_conversations(
+    request: Annotated[ConversationsRequest, Query()],
+) -> ConversationsResponse:
+    """Get conversations based on the provided request parameters."""
+    try:
+        conversations = list_conversations(limit=request.limit, sort=request.sort)
+        response = []
+        for conversation in conversations:
+            response.append(
+                Conversation(
+                    id=conversation.get("thread_id", ""),
+                    title=conversation.get("research_topic", ""),
+                    count=conversation.get("messages", 0),
+                    date=conversation.get("ts", ""),
+                    category=conversation.get("report_style", ""),
+                    data_type="database",  # Assuming default data type is 'txt'
+                )
+            )
+        data = ConversationsResponse(data=response)
+        return data
+    except Exception as e:
+        logger.exception(f"Error getting conversations: {str(e)}")
+        raise HTTPException(status_code=500, detail=INTERNAL_SERVER_ERROR_DETAIL)

@@ -3,7 +3,7 @@
 
 import json
 import logging
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Literal, Optional, Tuple, Union
 
 from langchain.callbacks.manager import (
     AsyncCallbackManagerForToolRun,
@@ -128,6 +128,7 @@ class TavilySearchWithImages(TavilySearchResults):  # type: ignore[override, ove
                 self.include_image_descriptions,
             )
         except Exception as e:
+            logger.error("Tavily search returned error: {}".format(e))
             return repr(e), {}
         cleaned_results = self.api_wrapper.clean_results_with_images(raw_results)
         logger.debug(
@@ -154,6 +155,7 @@ class TavilySearchWithImages(TavilySearchResults):  # type: ignore[override, ove
                 self.include_image_descriptions,
             )
         except Exception as e:
+            logger.error("Tavily search returned error: {}".format(e))
             return repr(e), {}
         cleaned_results = self.api_wrapper.clean_results_with_images(raw_results)
         logger.debug(
