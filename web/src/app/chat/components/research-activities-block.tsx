@@ -320,7 +320,7 @@ function RetrieverToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
                   />
                 </li>
               ))}
-            {documents.map((doc, i) => (
+            {documents?.map((doc, i) => (
               <motion.li
                 key={`search-result-${i}`}
                 className="text-muted-foreground bg-accent flex max-w-40 gap-2 rounded-md px-2 py-1 text-sm"
@@ -333,7 +333,7 @@ function RetrieverToolCall({ toolCall }: { toolCall: ToolCallRuntime }) {
                 }}
               >
                 <FileText size={32} />
-                {doc.title}
+                {doc.title} (chunk-{i},size-{doc.content.length})
               </motion.li>
             ))}
           </ul>
