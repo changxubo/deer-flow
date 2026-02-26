@@ -197,7 +197,12 @@ dev:
 	mkdir -p logs && nginx -g 'daemon off;' -c $(PWD)/docker/nginx/nginx.local.conf -p $(PWD) > logs/nginx.log 2>&1 & \
 	sleep 2; \
 	echo "✓ Nginx started on localhost:2026"; \
-	echo ""; \
+    echo "Starting Docker sandbox container...";\
+	docker rm -f deer-flow-sandbox >/dev/null 2>&1 || true; \
+	docker run -d --name deer-flow-sandbox --security-opt seccomp=unconfined --restart unless-stopped -p 8080:8080 enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-sandbox:latest; \
+	sleep 2; \
+	echo "✓ Docker sandbox container started."; \
+    echo ""; \
 	echo "=========================================="; \
 	echo "  DeerFlow is ready!"; \
 	echo "=========================================="; \
@@ -205,6 +210,7 @@ dev:
 	echo "  🌐 Application: http://localhost:2026"; \
 	echo "  📡 API Gateway: http://localhost:2026/api/*"; \
 	echo "  🤖 LangGraph:   http://localhost:2026/api/langgraph/*"; \
+	echo "  🐳 Sandbox:     http://localhost:8080/*"; \
 	echo ""; \
 	echo "  📋 Logs:"; \
 	echo "     - LangGraph: logs/langgraph.log"; \
