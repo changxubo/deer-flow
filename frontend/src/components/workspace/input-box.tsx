@@ -2,14 +2,16 @@
 
 import type { ChatStatus } from "ai";
 import {
+  BrainIcon,
   CheckIcon,
   GraduationCapIcon,
   LightbulbIcon,
   PaperclipIcon,
   PlusIcon,
-  SparklesIcon,
   RocketIcon,
+  SparklesIcon,
   ZapIcon,
+  GlobeIcon
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState, type ComponentProps } from "react";
@@ -43,6 +45,7 @@ import { useModels } from "@/core/models/hooks";
 import type { AgentThreadContext } from "@/core/threads";
 import { cn } from "@/lib/utils";
 
+import { Switch } from "@/components/ui/switch";
 import {
   ModelSelector,
   ModelSelectorContent,
@@ -196,7 +199,50 @@ export function InputBox({
               />
             </PromptInputActionMenuContent>
           </PromptInputActionMenu> */}
+           <ModelSelector
+            open={modelDialogOpen}
+            onOpenChange={setModelDialogOpen}
+          >
+            <ModelSelectorTrigger asChild>
+              <PromptInputButton>
+                <ModelSelectorName className="flex items-center gap-1 text-xs font-normal">
+                  <BrainIcon className="size-5" />
+                  {selectedModel?.display_name}
+                </ModelSelectorName>
+              </PromptInputButton>
+            </ModelSelectorTrigger>
+            <ModelSelectorContent>
+              <ModelSelectorInput placeholder={t.inputBox.searchModels} />
+              <ModelSelectorList>
+                {models.map((m) => (
+                  <ModelSelectorItem
+                    key={m.name}
+                    value={m.name}
+                    onSelect={() => handleModelSelect(m.name)}
+                  >
+                    <ModelSelectorName>{m.display_name}</ModelSelectorName>
+                    {m.name === context.model_name ? (
+                      <CheckIcon className="ml-auto size-4" />
+                    ) : (
+                      <div className="ml-auto size-4" />
+                    )}
+                  </ModelSelectorItem>
+                ))}
+              </ModelSelectorList>
+            </ModelSelectorContent>
+          </ModelSelector>
           <AddAttachmentsButton className="px-2!" />
+          <Tooltip content={t.inputBox.webSearch}>
+            <div className="flex items-center gap-2 rounded-md border border-input p-2 text-xs">
+              <GlobeIcon className="size-5" />
+              <Switch
+                checked={context.web_search_enabled}
+                onCheckedChange={(checked) =>
+                  onContextChange?.({ ...context, web_search_enabled: checked })
+                }
+              />
+            </div>
+          </Tooltip>
           <PromptInputActionMenu>
             <ModeHoverGuide
               mode={
@@ -210,15 +256,15 @@ export function InputBox({
             >
               <PromptInputActionMenuTrigger className="gap-1! px-2!">
                 <div>
-                  {context.mode === "flash" && <ZapIcon className="size-3" />}
+                  {context.mode === "flash" && <ZapIcon className="size-5" />}
                   {context.mode === "thinking" && (
-                    <LightbulbIcon className="size-3" />
+                    <LightbulbIcon className="size-5" />
                   )}
                   {context.mode === "pro" && (
-                    <GraduationCapIcon className="size-3" />
+                    <GraduationCapIcon className="size-5" />
                   )}
                   {context.mode === "ultra" && (
-                    <RocketIcon className="size-3 text-[#dabb5e]" />
+                    <RocketIcon className="size-5 text-[#dabb5e]" />
                   )}
                 </div>
                 <div
@@ -368,37 +414,7 @@ export function InputBox({
           </PromptInputActionMenu>
         </PromptInputTools>
         <PromptInputTools>
-          <ModelSelector
-            open={modelDialogOpen}
-            onOpenChange={setModelDialogOpen}
-          >
-            <ModelSelectorTrigger asChild>
-              <PromptInputButton>
-                <ModelSelectorName className="text-xs font-normal">
-                  {selectedModel?.display_name}
-                </ModelSelectorName>
-              </PromptInputButton>
-            </ModelSelectorTrigger>
-            <ModelSelectorContent>
-              <ModelSelectorInput placeholder={t.inputBox.searchModels} />
-              <ModelSelectorList>
-                {models.map((m) => (
-                  <ModelSelectorItem
-                    key={m.name}
-                    value={m.name}
-                    onSelect={() => handleModelSelect(m.name)}
-                  >
-                    <ModelSelectorName>{m.display_name}</ModelSelectorName>
-                    {m.name === context.model_name ? (
-                      <CheckIcon className="ml-auto size-4" />
-                    ) : (
-                      <div className="ml-auto size-4" />
-                    )}
-                  </ModelSelectorItem>
-                ))}
-              </ModelSelectorList>
-            </ModelSelectorContent>
-          </ModelSelector>
+         
           <PromptInputSubmit
             className="rounded-full"
             disabled={disabled}
@@ -497,7 +513,7 @@ function AddAttachmentsButton({ className }: { className?: string }) {
         className={cn("px-2!", className)}
         onClick={() => attachments.openFileDialog()}
       >
-        <PaperclipIcon className="size-3" />
+        <PaperclipIcon className="size-5" />Attach
       </PromptInputButton>
     </Tooltip>
   );

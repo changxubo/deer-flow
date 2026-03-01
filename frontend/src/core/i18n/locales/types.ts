@@ -5,7 +5,7 @@ export interface Translations {
   locale: {
     localName: string;
   };
-
+  
   // Common
   common: {
     home: string;
@@ -40,6 +40,7 @@ export interface Translations {
     description: string;
     createYourOwnSkill: string;
     createYourOwnSkillDescription: string;
+    welcomeMessages: string[];
   };
 
   // Clipboard

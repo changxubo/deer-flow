@@ -12,6 +12,7 @@ import {
 import { RecentChatList } from "./recent-chat-list";
 import { WorkspaceHeader } from "./workspace-header";
 import { WorkspaceNavChatList } from "./workspace-nav-chat-list";
+import { WorkspaceNavSettingsOptions } from "./workspace-nav-settings-options";
 import { WorkspaceNavMenu } from "./workspace-nav-menu";
 
 export function WorkspaceSidebar({
@@ -23,9 +24,11 @@ export function WorkspaceSidebar({
       <Sidebar variant="sidebar" collapsible="icon" {...props}>
         <SidebarHeader className="py-0">
           <WorkspaceHeader />
+          <WorkspaceNavSettingsOptions />
+          <WorkspaceNavChatList />
         </SidebarHeader>
         <SidebarContent>
-          <WorkspaceNavChatList />
+          
           {isSidebarOpen && <RecentChatList />}
         </SidebarContent>
         <SidebarFooter>

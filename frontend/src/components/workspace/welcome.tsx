@@ -6,7 +6,7 @@ import { useEffect, useMemo } from "react";
 import { useI18n } from "@/core/i18n/hooks";
 import { cn } from "@/lib/utils";
 
-import { AuroraText } from "../ui/aurora-text";
+import WelcomeText from "./welcome-text";
 
 let waved = false;
 
@@ -41,10 +41,7 @@ export function Welcome({
           `✨ ${t.welcome.createYourOwnSkill} ✨`
         ) : (
           <div className="flex items-center gap-2">
-            <div className={cn("inline-block", !waved ? "animate-wave" : "")}>
-              {isUltra ? "🚀" : "👋"}
-            </div>
-            <AuroraText colors={colors}>{t.welcome.greeting}</AuroraText>
+            <WelcomeText />
           </div>
         )}
       </div>
@@ -59,7 +56,7 @@ export function Welcome({
           )}
         </div>
       ) : (
-        <div className="text-muted-foreground text-sm">
+        <div className="text-muted-foreground text-sm hidden">
           {t.welcome.description.includes("\n") ? (
             <pre className="whitespace-pre">{t.welcome.description}</pre>
           ) : (

@@ -49,11 +49,53 @@ export const enUS: Translations = {
   welcome: {
     greeting: "Hello, again!",
     description:
-      "Welcome to 🦌 DeerFlow, an open source super agent. With built-in and custom skills, DeerFlow helps you search on the web, analyze data, and generate artifacts like slides, web pages and do almost anything.",
+      "Welcome to 🐒 Wukong Agent, an open source super agent. With built-in and custom skills, Wukong Agent helps you search on the web, analyze data, and generate artifacts like slides, web pages and do almost anything.",
 
     createYourOwnSkill: "Create Your Own Skill",
     createYourOwnSkillDescription:
-      "Create your own skill to release the power of DeerFlow. With customized skills,\nDeerFlow can help you search on the web, analyze data, and generate\n artifacts like slides, web pages and do almost anything.",
+      "Create your own skill to release the power of Wukong Agent. With customized skills,\nWukong Agent can help you search on the web, analyze data, and generate\n artifacts like slides, web pages and do almost anything.",
+    welcomeMessages: [
+      "Welcome back 😊",
+      "Hi, I'm here",
+      "All set!",
+      "Great to see you",
+      "Ready to begin?",
+      "Let me help with today’s tasks",
+      "Keep moving forward!",
+      "Let’s do this 💪",
+      "Let’s get to work 🏃‍♂️",
+      "Productivity at max~",
+      "At your service!",
+      "Thanks for waiting ☕",
+      "Let’s get started ✅",
+      "Got new questions?",
+      "You’ve worked hard today!",
+      "Loading inspiration",
+      "Fully charged ⚡",
+      "Let’s go! 🚀",
+      "My thoughts are in sync.",
+      "Inspiration incoming",
+      "Just waiting for your call",
+      "Back to high-efficiency mode!",
+      "Standing by",
+      "Ready for the challenge",
+      "New ideas are forming",
+      "The path is clear—let’s go!",
+      "System online, ready to help 💡",
+      "Loading good vibes",
+      "Take control, starting now 🎵",
+      "Boosting efficiency …",
+      "Today’s goals, on track 🎯",
+      "Let your ideas shine ✨",
+      "Task update complete",
+      "Everything’s ready",
+      "Acceleration mode: ON",
+      "Alright! Let’s begin 😎",
+      "I’m here waiting for you",
+      "Keep up the good work!",
+      "Don’t forget to take a break~ 💤",
+    ]
+
   },
 
   // Clipboard
@@ -139,26 +181,26 @@ export const enUS: Translations = {
   // Sidebar
   sidebar: {
     newChat: "New chat",
-    chats: "Chats",
-    recentChats: "Recent chats",
-    demoChats: "Demo chats",
+    chats: "Conversations",
+    recentChats: "Recent conversations",
+    demoChats: "Demo conversations",
   },
 
   // Breadcrumb
   breadcrumb: {
     workspace: "Workspace",
-    chats: "Chats",
+    chats: "Conversations",
   },
 
   // Workspace
   workspace: {
-    officialWebsite: "DeerFlow's official website",
-    githubTooltip: "DeerFlow on Github",
-    settingsAndMore: "Settings and more",
-    visitGithub: "DeerFlow on GitHub",
+    officialWebsite: "Documentation",
+    githubTooltip: "Github Repository",
+    settingsAndMore: "Settings",
+    visitGithub: "GitHub Repository",
     reportIssue: "Report a issue",
     contactUs: "Contact us",
-    about: "About DeerFlow",
+    about: "About DeepAgents",
   },
 
   // Conversation
@@ -174,7 +216,7 @@ export const enUS: Translations = {
 
   // Page titles (document title)
   pages: {
-    appName: "DeerFlow",
+    appName: "Wukong Agent",
     chats: "Chats",
     newChat: "New chat",
     untitled: "Untitled",
