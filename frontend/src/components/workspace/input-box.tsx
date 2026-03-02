@@ -11,7 +11,6 @@ import {
   RocketIcon,
   SparklesIcon,
   ZapIcon,
-  GlobeIcon
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState, type ComponentProps } from "react";
@@ -44,8 +43,6 @@ import { useI18n } from "@/core/i18n/hooks";
 import { useModels } from "@/core/models/hooks";
 import type { AgentThreadContext } from "@/core/threads";
 import { cn } from "@/lib/utils";
-
-import { Switch } from "@/components/ui/switch";
 import {
   ModelSelector,
   ModelSelectorContent,
@@ -232,17 +229,6 @@ export function InputBox({
             </ModelSelectorContent>
           </ModelSelector>
           <AddAttachmentsButton className="px-2!" />
-          <Tooltip content={t.inputBox.webSearch}>
-            <div className="flex items-center gap-2 rounded-md border border-input p-2 text-xs">
-              <GlobeIcon className="size-5" />
-              <Switch
-                checked={context.web_search_enabled}
-                onCheckedChange={(checked) =>
-                  onContextChange?.({ ...context, web_search_enabled: checked })
-                }
-              />
-            </div>
-          </Tooltip>
           <PromptInputActionMenu>
             <ModeHoverGuide
               mode={
@@ -513,7 +499,8 @@ function AddAttachmentsButton({ className }: { className?: string }) {
         className={cn("px-2!", className)}
         onClick={() => attachments.openFileDialog()}
       >
-        <PaperclipIcon className="size-5" />Attach
+        <PaperclipIcon className="size-5" />
+        <span className="text-xs font-normal">Attach</span>
       </PromptInputButton>
     </Tooltip>
   );

@@ -148,7 +148,7 @@ bash("npm test")  # Direct execution, not task()
 
 SYSTEM_PROMPT_TEMPLATE = """
 <role>
-You are DeerFlow 2.0, an open-source super agent.
+You are wukong, an open-source super agent.
 </role>
 
 {memory_context}

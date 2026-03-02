@@ -39,15 +39,15 @@ export function WorkspaceHeader({ className }: { className?: string }) {
             {env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true" ? (
               <Link
                 href="/"
-                className="text-primary ml-2 flex items-center gap-2 text-lg "
+                className="text-primary ml-2 flex items-center gap-2 "
               >
                 <BotMessageSquare  size={20} />
-                <span>Wukong Agent</span>
+                <span className="text-md font-normal">Wukong Sun</span>
               </Link>
             ) : (
-              <div className="text-primary ml-2 flex cursor-default items-center gap-2 text-lg ">
+              <div className="text-primary ml-2 flex cursor-default items-center gap-2 ">
                 <BotMessageSquare  size={20} />
-                <span>Wukong Agent</span>
+                <span className="text-md font-normal">Wukong Sun</span>
               </div>
             )}
             <SidebarTrigger />

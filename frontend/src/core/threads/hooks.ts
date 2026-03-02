@@ -34,6 +34,9 @@ export function useThreadStream({
     threadId: isNewThread ? undefined : threadId,
     reconnectOnMount: true,
     fetchStateHistory: true,
+    fetchStateHistory: {
+      limit: 1, // Adjust the limit as needed
+    },
     onCustomEvent(event: unknown) {
       console.info(event);
       if (
@@ -177,6 +180,9 @@ export function useThreads(
     limit: 50,
     sortBy: "updated_at",
     sortOrder: "desc",
+     select: [
+      "thread_id", "updated_at", "values"
+    ],
   },
 ) {
   const apiClient = getAPIClient();
