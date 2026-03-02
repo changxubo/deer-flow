@@ -166,6 +166,7 @@ export interface Translations {
     description: string;
     sections: {
       appearance: string;
+      language: string;
       memory: string;
       tools: string;
       skills: string;

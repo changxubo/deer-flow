@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { AboutSettingsPage } from "@/components/workspace/settings/about-settings-page";
+import { LanguageSettingsPage } from "@/components/workspace/settings/language-settings-page";
 import { AppearanceSettingsPage } from "@/components/workspace/settings/appearance-settings-page";
 import { MemorySettingsPage } from "@/components/workspace/settings/memory-settings-page";
 import { NotificationSettingsPage } from "@/components/workspace/settings/notification-settings-page";
@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 
 type SettingsSection =
   | "appearance"
+  | "language"
   | "memory"
   | "tools"
   | "skills"
@@ -59,10 +60,22 @@ export function SettingsDialog(props: SettingsDialogProps) {
         label: t.settings.sections.appearance,
         icon: PaletteIcon,
       },
+      {
+        id: "language",
+        label: t.settings.sections.language,
+        icon: WrenchIcon,
+      },
+      {
+        id: "notification",
+        label: t.settings.sections.notification,
+        icon: BellIcon,
+      },
       { id: "about", label: t.settings.sections.about, icon: InfoIcon },
     ],
     [
       t.settings.sections.appearance,
+      t.settings.sections.language,
+      t.settings.sections.notification,
       t.settings.sections.about,
     ],
   );
@@ -109,6 +122,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
           <ScrollArea className="h-full min-h-0 rounded-lg border">
             <div className="space-y-8 p-6">
               {activeSection === "appearance" && <AppearanceSettingsPage />}
+              {activeSection === "language" && <LanguageSettingsPage />}
               {activeSection === "memory" && <MemorySettingsPage />}
               {activeSection === "tools" && <ToolSettingsPage />}
               {activeSection === "skills" && (

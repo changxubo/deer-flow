@@ -200,7 +200,7 @@ export const enUS: Translations = {
     visitGithub: "GitHub Repository",
     reportIssue: "Report a issue",
     contactUs: "Contact us",
-    about: "About DeepAgents",
+    about: "About",
   },
 
   // Conversation
@@ -242,7 +242,7 @@ export const enUS: Translations = {
     writeFile: "Write file",
     clickToViewContent: "Click to view file content",
     writeTodos: "Update to-do list",
-    skillInstallTooltip: "Install skill and make it available to DeerFlow",
+    skillInstallTooltip: "Install skill and make it available to Wukong",
   },
 
   // Subtasks
@@ -258,19 +258,20 @@ export const enUS: Translations = {
   // Settings
   settings: {
     title: "Settings",
-    description: "Adjust how DeerFlow looks and behaves for you.",
+    description: "Adjust how Wukong looks and behaves for you.",
     sections: {
       appearance: "Appearance",
+      language: "Language",
       memory: "Memory",
       tools: "Tools",
       skills: "Skills",
-      notification: "Notification",
+      notification: "Notifications",
       about: "About",
     },
     memory: {
       title: "Memory",
       description:
-        "DeerFlow automatically learns from your conversations in the background. These memories help DeerFlow understand you better and deliver a more personalized experience.",
+        "Wukong automatically learns from your conversations in the background. These memories help Wukong understand you better and deliver a more personalized experience.",
       empty: "No memory data to display.",
       rawJson: "Raw JSON",
       markdown: {
@@ -326,18 +327,18 @@ export const enUS: Translations = {
       createSkill: "Create skill",
       emptyTitle: "No agent skill yet",
       emptyDescription:
-        "Put your agent skill folders under the `/skills/custom` folder under the root folder of DeerFlow.",
+        "Put your agent skill folders under the `/skills/custom` folder under the root folder of Wukong.",
       emptyButton: "Create Your First Skill",
     },
     notification: {
       title: "Notification",
       description:
-        "DeerFlow only sends a completion notification when the window is not active. This is especially useful for long-running tasks so you can switch to other work and get notified when done.",
+        "Wukong only sends a completion notification when the window is not active. This is especially useful for long-running tasks so you can switch to other work and get notified when done.",
       requestPermission: "Request notification permission",
       deniedHint:
         "Notification permission was denied. You can enable it in your browser's site settings to receive completion alerts.",
       testButton: "Send test notification",
-      testTitle: "DeerFlow",
+      testTitle: "Wukong",
       testBody: "This is a test notification.",
       notSupported: "Your browser does not support notifications.",
       disableNotification: "Disable notification",

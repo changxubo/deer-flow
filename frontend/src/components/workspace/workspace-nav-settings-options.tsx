@@ -40,11 +40,6 @@ export function WorkspaceNavSettingsOptions() {
       icon: WrenchIcon,
       href: "/workspace/tools",
     },
-    {
-      label: t.settings.sections.notification,
-      icon: BellIcon,
-      href: "/workspace/notifications",
-    },
   ];
 
   return (
