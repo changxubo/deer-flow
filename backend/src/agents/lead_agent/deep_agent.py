@@ -1,4 +1,4 @@
-from langchain.agents import create_agent
+from deepagents import create_deep_agent
 from langchain.agents.middleware import SummarizationMiddleware, TodoListMiddleware
 from langchain.agents.middleware import PIIMiddleware
 from langchain_core.runnables import RunnableConfig
@@ -252,7 +252,7 @@ def _setup_persistence() -> PostgresSaver | None:
         _checkpointer = checkpointer.setup()
         return _checkpointer
 
-def make_lead_agent(config: RunnableConfig):
+def make_deep_agent(config: RunnableConfig):
     # Lazy import to avoid circular dependency
     from src.tools import get_available_tools
 
@@ -293,4 +293,4 @@ def make_lead_agent(config: RunnableConfig):
     if checkpointer := _setup_persistence():
         agent_kwargs["checkpointer"] = checkpointer
 
-    return create_agent(**agent_kwargs)
+    return create_deep_agent(**agent_kwargs)
