@@ -33,7 +33,6 @@ export function useThreadStream({
     assistantId: "lead_agent",
     threadId: isNewThread ? undefined : threadId,
     reconnectOnMount: true,
-    fetchStateHistory: true,
     fetchStateHistory: {
       limit: 1, // Adjust the limit as needed
     },

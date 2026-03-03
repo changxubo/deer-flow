@@ -1,6 +1,10 @@
 from langchain.agents import create_agent
 from langchain.agents.middleware import SummarizationMiddleware, TodoListMiddleware
+from langchain.agents.middleware import PIIMiddleware
 from langchain_core.runnables import RunnableConfig
+from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.store.memory import InMemoryStore
+from psycopg_pool import ConnectionPool
 
 from src.agents.lead_agent.prompt import apply_prompt_template
 from src.agents.middlewares.clarification_middleware import ClarificationMiddleware
@@ -13,6 +17,8 @@ from src.agents.middlewares.uploads_middleware import UploadsMiddleware
 from src.agents.middlewares.view_image_middleware import ViewImageMiddleware
 from src.agents.thread_state import ThreadState
 from src.config.summarization_config import get_summarization_config
+from src.config.persistence_config import get_persistence_config
+from src.config.app_config import get_app_config
 from src.models import create_chat_model
 from src.sandbox.middleware import SandboxMiddleware
 
@@ -185,68 +191,79 @@ Being proactive with task management demonstrates thoroughness and ensures all r
 # ViewImageMiddleware should be before ClarificationMiddleware to inject image details before LLM
 # ClarificationMiddleware should be last to intercept clarification requests after model calls
 def _build_middlewares(config: RunnableConfig):
-    """Build middleware chain based on runtime configuration.
+    """Build middleware chain based on runtime configuration."""
+    middlewares = [
+        ThreadDataMiddleware(),
+        UploadsMiddleware(),
+        SandboxMiddleware(),
+        DanglingToolCallMiddleware(),
+    ]
 
-    Args:
-        config: Runtime configuration containing configurable options like is_plan_mode.
+    configurable = config.get("configurable", {})
+    is_plan_mode = configurable.get("is_plan_mode", False)
+    subagent_enabled = configurable.get("subagent_enabled", False)
+    model_name = configurable.get("model_name") or configurable.get("model")
 
-    Returns:
-        List of middleware instances.
-    """
-    middlewares = [ThreadDataMiddleware(), UploadsMiddleware(), SandboxMiddleware(), DanglingToolCallMiddleware()]
-
-    # Add summarization middleware if enabled
-    summarization_middleware = _create_summarization_middleware()
-    if summarization_middleware is not None:
+    if summarization_middleware := _create_summarization_middleware():
         middlewares.append(summarization_middleware)
 
-    # Add TodoList middleware if plan mode is enabled
-    is_plan_mode = config.get("configurable", {}).get("is_plan_mode", False)
-    todo_list_middleware = _create_todo_list_middleware(is_plan_mode)
-    if todo_list_middleware is not None:
+    if todo_list_middleware := _create_todo_list_middleware(is_plan_mode):
         middlewares.append(todo_list_middleware)
 
-    # Add TitleMiddleware
-    middlewares.append(TitleMiddleware())
-
-    # Add MemoryMiddleware (after TitleMiddleware)
-    middlewares.append(MemoryMiddleware())
-
-    # Add ViewImageMiddleware only if the current model supports vision
-    model_name = config.get("configurable", {}).get("model_name") or config.get("configurable", {}).get("model")
-    from src.config import get_app_config
+    middlewares.extend([TitleMiddleware(), MemoryMiddleware()])
 
     app_config = get_app_config()
-    # If no model_name specified, use the first model (default)
     if model_name is None and app_config.models:
         model_name = app_config.models[0].name
 
-    model_config = app_config.get_model_config(model_name) if model_name else None
-    if model_config is not None and model_config.supports_vision:
-        middlewares.append(ViewImageMiddleware())
+    if model_config := app_config.get_model_config(model_name):
+        if model_config.supports_vision:
+            middlewares.append(ViewImageMiddleware())
 
-    # Add SubagentLimitMiddleware to truncate excess parallel task calls
-    subagent_enabled = config.get("configurable", {}).get("subagent_enabled", False)
     if subagent_enabled:
-        max_concurrent_subagents = config.get("configurable", {}).get("max_concurrent_subagents", 3)
+        max_concurrent_subagents = configurable.get("max_concurrent_subagents", 3)
         middlewares.append(SubagentLimitMiddleware(max_concurrent=max_concurrent_subagents))
 
-    # ClarificationMiddleware should always be last
-    middlewares.append(ClarificationMiddleware())
+    middlewares.extend([
+        PIIMiddleware("email", strategy="redact", apply_to_input=True),
+        PIIMiddleware("credit_card", strategy="mask", apply_to_input=True),
+        PIIMiddleware("api_key", detector=r"sk-[a-zA-Z0-9]{32}", strategy="block"),
+        ClarificationMiddleware(),  # Should always be last
+    ])
+
     return middlewares
 
+
+def _setup_persistence() -> PostgresSaver | None:
+    """Create and configure the Postgres checkpointer if persistence is enabled."""
+    persistence_config = get_persistence_config()
+    print(f"Persistence config: enabled={persistence_config.enabled}, connection_string={persistence_config.connection_string}")
+    if not persistence_config.enabled:
+        return None
+
+    connection_kwargs = {
+        "autocommit": True,
+        "row_factory": "dict_row",
+        "prepare_threshold": 0,
+    }
+    pool = ConnectionPool(persistence_config.connection_string, kwargs=connection_kwargs)
+    checkpointer = PostgresSaver(pool)
+    checkpointer.setup()
+    return checkpointer
 
 def make_lead_agent(config: RunnableConfig):
     # Lazy import to avoid circular dependency
     from src.tools import get_available_tools
 
-    thinking_enabled = config.get("configurable", {}).get("thinking_enabled", True)
-    model_name = config.get("configurable", {}).get("model_name") or config.get("configurable", {}).get("model")
-    is_plan_mode = config.get("configurable", {}).get("is_plan_mode", False)
-    subagent_enabled = config.get("configurable", {}).get("subagent_enabled", False)
-    max_concurrent_subagents = config.get("configurable", {}).get("max_concurrent_subagents", 3)
+    configurable = config.get("configurable", {})
+    thinking_enabled = configurable.get("thinking_enabled", True)
+    model_name = configurable.get("model_name") or configurable.get("model")
+    is_plan_mode = configurable.get("is_plan_mode", False)
+    subagent_enabled = configurable.get("subagent_enabled", False)
+    max_concurrent_subagents = configurable.get("max_concurrent_subagents", 3)
+
     print(f"thinking_enabled: {thinking_enabled}, model_name: {model_name}, is_plan_mode: {is_plan_mode}, subagent_enabled: {subagent_enabled}, max_concurrent_subagents: {max_concurrent_subagents}")
-    
+
     # Inject run metadata for LangSmith trace tagging
     if "metadata" not in config:
         config["metadata"] = {}
@@ -256,11 +273,18 @@ def make_lead_agent(config: RunnableConfig):
         "is_plan_mode": is_plan_mode,
         "subagent_enabled": subagent_enabled,
     })
-    
-    return create_agent(
-        model=create_chat_model(name=model_name, thinking_enabled=thinking_enabled),
-        tools=get_available_tools(model_name=model_name, subagent_enabled=subagent_enabled),
-        middleware=_build_middlewares(config),
-        system_prompt=apply_prompt_template(subagent_enabled=subagent_enabled, max_concurrent_subagents=max_concurrent_subagents),
-        state_schema=ThreadState,
-    )
+
+    agent_kwargs = {
+        "model": create_chat_model(name=model_name, thinking_enabled=thinking_enabled),
+        "tools": get_available_tools(model_name=model_name, subagent_enabled=subagent_enabled),
+        "middleware": _build_middlewares(config),
+        "system_prompt": apply_prompt_template(subagent_enabled=subagent_enabled, max_concurrent_subagents=max_concurrent_subagents),
+        "state_schema": ThreadState,
+        "store": InMemoryStore(),
+        "debug": True,
+    }
+
+    if checkpointer := _setup_persistence():
+        agent_kwargs["checkpointer"] = checkpointer
+
+    return create_agent(**agent_kwargs)

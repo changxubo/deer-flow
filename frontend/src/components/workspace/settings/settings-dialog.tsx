@@ -3,9 +3,7 @@
 import {
   BellIcon,
   InfoIcon,
-  BrainIcon,
   PaletteIcon,
-  SparklesIcon,
   WrenchIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -23,8 +21,10 @@ import { MemorySettingsPage } from "@/components/workspace/settings/memory-setti
 import { NotificationSettingsPage } from "@/components/workspace/settings/notification-settings-page";
 import { SkillSettingsPage } from "@/components/workspace/settings/skill-settings-page";
 import { ToolSettingsPage } from "@/components/workspace/settings/tool-settings-page";
+import { AboutSettingsPage } from "@/components/workspace/settings/about-settings-page";
 import { useI18n } from "@/core/i18n/hooks";
 import { cn } from "@/lib/utils";
+
 
 type SettingsSection =
   | "appearance"
