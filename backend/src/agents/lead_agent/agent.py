@@ -4,7 +4,6 @@ from langchain.agents.middleware import PIIMiddleware
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.store.memory import InMemoryStore
-from psycopg_pool import ConnectionPool
 
 from src.agents.lead_agent.prompt import apply_prompt_template
 from src.agents.middlewares.clarification_middleware import ClarificationMiddleware
@@ -234,22 +233,26 @@ def _build_middlewares(config: RunnableConfig):
     return middlewares
 
 
+from psycopg_pool import AsyncConnectionPool
+
+
+# Global instances for checkpointer
+_checkpointer: PostgresSaver | None = None
+
 def _setup_persistence() -> PostgresSaver | None:
-    """Create and configure the Postgres checkpointer if persistence is enabled."""
+    """Create and configure a singleton Postgres checkpointer."""
+    global _checkpointer
+    if _checkpointer is not None:
+        return _checkpointer
+    
     persistence_config = get_persistence_config()
-    print(f"Persistence config: enabled={persistence_config.enabled}, connection_string={persistence_config.connection_string}")
     if not persistence_config.enabled:
         return None
-
-    connection_kwargs = {
-        "autocommit": True,
-        "row_factory": "dict_row",
-        "prepare_threshold": 0,
-    }
-    pool = ConnectionPool(persistence_config.connection_string, kwargs=connection_kwargs)
-    checkpointer = PostgresSaver(pool)
-    checkpointer.setup()
-    return checkpointer
+    
+    with PostgresSaver.from_conn_string(persistence_config.connection_string) as checkpointer:
+        _checkpointer = checkpointer
+        _checkpointer = checkpointer.setup()
+        return _checkpointer
 
 def make_lead_agent(config: RunnableConfig):
     # Lazy import to avoid circular dependency
