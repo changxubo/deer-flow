@@ -1,3 +1,5 @@
+from logging import config
+
 from langchain.agents import create_agent
 from langchain.agents.middleware import SummarizationMiddleware, TodoListMiddleware
 from langchain.agents.middleware import PIIMiddleware
@@ -20,7 +22,9 @@ from src.config.persistence_config import get_persistence_config
 from src.config.app_config import get_app_config
 from src.models import create_chat_model
 from src.sandbox.middleware import SandboxMiddleware
-
+from langfuse.langchain import CallbackHandler
+ 
+langfuse_handler = CallbackHandler()
 
 def _create_summarization_middleware() -> SummarizationMiddleware | None:
     """Create and configure the summarization middleware from config."""
@@ -232,10 +236,6 @@ def _build_middlewares(config: RunnableConfig):
 
     return middlewares
 
-
-from psycopg_pool import AsyncConnectionPool
-
-
 # Global instances for checkpointer
 _checkpointer: PostgresSaver | None = None
 
@@ -268,6 +268,11 @@ def make_lead_agent(config: RunnableConfig):
     print(f"thinking_enabled: {thinking_enabled}, model_name: {model_name}, is_plan_mode: {is_plan_mode}, subagent_enabled: {subagent_enabled}, max_concurrent_subagents: {max_concurrent_subagents}")
 
     # Inject run metadata for LangSmith trace tagging
+    if "callbacks" not in config:
+        config["callbacks"] = []
+    existing_callbacks = config["callbacks"] or []
+    config["callbacks"] = [*existing_callbacks, langfuse_handler]
+
     if "metadata" not in config:
         config["metadata"] = {}
     config["metadata"].update({
@@ -284,7 +289,7 @@ def make_lead_agent(config: RunnableConfig):
         "system_prompt": apply_prompt_template(subagent_enabled=subagent_enabled, max_concurrent_subagents=max_concurrent_subagents),
         "state_schema": ThreadState,
         "store": InMemoryStore(),
-        "debug": True,
+        "debug": True, 
     }
 
     if checkpointer := _setup_persistence():

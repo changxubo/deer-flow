@@ -3,7 +3,9 @@ from langchain.chat_models import BaseChatModel
 
 from src.config import get_app_config, get_tracing_config, is_tracing_enabled
 from src.reflection import resolve_class
-
+from langfuse.langchain import CallbackHandler
+ 
+langfuse_handler = CallbackHandler()
 logger = logging.getLogger(__name__)
 
 def create_chat_model(name: str | None = None, thinking_enabled: bool = False, **kwargs) -> BaseChatModel:
@@ -49,7 +51,7 @@ def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *
                 project_name=tracing_config.project,
             )
             existing_callbacks = model_instance.callbacks or []
-            model_instance.callbacks = [*existing_callbacks, tracer]
+            model_instance.callbacks = [*existing_callbacks, tracer, langfuse_handler]
             logger.debug(
                 f"LangSmith tracing attached to model '{name}' (project='{tracing_config.project}')"
             )
