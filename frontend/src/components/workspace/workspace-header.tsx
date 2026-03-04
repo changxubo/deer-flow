@@ -41,13 +41,13 @@ export function WorkspaceHeader({ className }: { className?: string }) {
                 href="/"
                 className="text-primary ml-2 flex items-center gap-2 "
               >
-                <BotMessageSquare  size={20} />
-                <span className="text-md font-normal">Wukong</span>
+                <BotMessageSquare  size={20} className="hidden"/>
+                <span className="text-lg font-normal">Wukong</span>
               </Link>
             ) : (
               <div className="text-primary ml-2 flex cursor-default items-center gap-2 ">
-                <BotMessageSquare  size={20} />
-                <span className="text-md font-normal">Wukong</span>
+                <BotMessageSquare  size={20} className="hidden"/>
+                <span className="text-lg font-normal">Wukong</span>
               </div>
             )}
             <SidebarTrigger />
