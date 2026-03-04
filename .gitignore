@@ -46,3 +46,7 @@ sandbox_image_cache.tar
 
 # ignore the legacy `web` folder
 web/
+backend/docker-run.sh
+backend/docker-compose.yaml
+backend/cofig.yaml
+backend/resolved_compose.yaml
