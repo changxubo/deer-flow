@@ -1,9 +1,7 @@
 from langchain.agents import create_agent
-from langchain.agents.middleware import SummarizationMiddleware, TodoListMiddleware
-from langchain.agents.middleware import PIIMiddleware
+from langchain.agents.middleware import PIIMiddleware, SummarizationMiddleware, TodoListMiddleware
 from langchain_core.runnables import RunnableConfig
-from langgraph.checkpoint.postgres import PostgresSaver
-from langgraph.store.memory import InMemoryStore
+from langfuse.langchain import CallbackHandler
 
 from src.agents.lead_agent.prompt import apply_prompt_template
 from src.agents.middlewares.clarification_middleware import ClarificationMiddleware
@@ -15,13 +13,11 @@ from src.agents.middlewares.title_middleware import TitleMiddleware
 from src.agents.middlewares.uploads_middleware import UploadsMiddleware
 from src.agents.middlewares.view_image_middleware import ViewImageMiddleware
 from src.agents.thread_state import ThreadState
-from src.config.summarization_config import get_summarization_config
-from src.config.persistence_config import get_persistence_config
 from src.config.app_config import get_app_config
+from src.config.summarization_config import get_summarization_config
 from src.models import create_chat_model
 from src.sandbox.middleware import SandboxMiddleware
-from langfuse.langchain import CallbackHandler
- 
+
 langfuse_handler = CallbackHandler()
 
 def _create_summarization_middleware() -> SummarizationMiddleware | None:
@@ -234,23 +230,6 @@ def _build_middlewares(config: RunnableConfig):
 
     return middlewares
 
-# Global instances for checkpointer
-_checkpointer: PostgresSaver | None = None
-
-def _setup_persistence() -> PostgresSaver | None:
-    """Create and configure a singleton Postgres checkpointer."""
-    global _checkpointer
-    if _checkpointer is not None:
-        return _checkpointer
-    
-    persistence_config = get_persistence_config()
-    if not persistence_config.enabled:
-        return None
-    
-    with PostgresSaver.from_conn_string(persistence_config.connection_string) as checkpointer:
-        _checkpointer = checkpointer
-        _checkpointer = checkpointer.setup()
-        return _checkpointer
 
 def make_lead_agent(config: RunnableConfig):
     # Lazy import to avoid circular dependency
@@ -286,11 +265,7 @@ def make_lead_agent(config: RunnableConfig):
         "middleware": _build_middlewares(config),
         "system_prompt": apply_prompt_template(subagent_enabled=subagent_enabled, max_concurrent_subagents=max_concurrent_subagents),
         "state_schema": ThreadState,
-        "store": InMemoryStore(),
         "debug": True, 
     }
-
-    if checkpointer := _setup_persistence():
-        agent_kwargs["checkpointer"] = checkpointer
 
     return create_agent(**agent_kwargs)

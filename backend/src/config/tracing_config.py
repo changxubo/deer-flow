@@ -1,7 +1,8 @@
 import logging
 import os
-from pydantic import BaseModel, Field
 import threading
+
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 _config_lock = threading.Lock()

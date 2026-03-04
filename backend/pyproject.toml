@@ -34,6 +34,10 @@ dependencies = [
     "psycopg[binary]>=3.3.3",
     "langgraph-checkpoint-postgres>=3.0.4",
     "langfuse>=3.14.5",
+    "unicorn>=2.1.4",
+    "python-dotenv>=1.2.1",
+    "langgraph-checkpoint-sqlite>=3.0.3",
+    "redis>=7.2.1",
 ]
 
 [dependency-groups]

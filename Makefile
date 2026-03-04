@@ -221,7 +221,82 @@ dev:
 	echo "Press Ctrl+C to stop all services"; \
 	echo ""; \
 	wait
-
+up:
+	@echo "Stopping existing services if any..."
+	@-pkill -f "langgraph up" 2>/dev/null || true
+	@-pkill -f "uvicorn src.gateway.app:app" 2>/dev/null || true
+	@-pkill -f "next dev" 2>/dev/null || true
+	@-nginx -c $(PWD)/docker/nginx/nginx.local.conf -p $(PWD) -s quit 2>/dev/null || true
+	@sleep 1
+	@-pkill -9 nginx 2>/dev/null || true
+	@-./scripts/cleanup-containers.sh deer-flow-sandbox 2>/dev/null || true
+	@sleep 1
+	@echo ""
+	@echo "=========================================="
+	@echo "  Starting DeerFlow Development Server"
+	@echo "=========================================="
+	@echo ""
+	@echo "Services starting up..."
+	@echo "  → Backend: LangGraph + Gateway"
+	@echo "  → Frontend: Next.js"
+	@echo "  → Nginx: Reverse Proxy"
+	@echo ""
+	@cleanup() { \
+		echo ""; \
+		echo "Shutting down services..."; \
+		pkill -f "langgraph up" 2>/dev/null || true; \
+		pkill -f "uvicorn src.gateway.app:app" 2>/dev/null || true; \
+		pkill -f "next dev" 2>/dev/null || true; \
+		nginx -c $(PWD)/docker/nginx/nginx.local.conf -p $(PWD) -s quit 2>/dev/null || true; \
+		sleep 1; \
+		pkill -9 nginx 2>/dev/null || true; \
+		echo "Cleaning up sandbox containers..."; \
+		./scripts/cleanup-containers.sh deer-flow-sandbox 2>/dev/null || true; \
+		echo "✓ All services stopped"; \
+		exit 0; \
+	}; \
+	trap cleanup INT TERM; \
+	mkdir -p logs; \
+	echo "Starting LangGraph server..."; \
+	cd backend && NO_COLOR=1 PY_COLORS=0 CLICOLOR=0 TERM=dumb uv run langgraph up --port 2024 2>&1 | sed -r 's/\x1B\[[0-9;]*[[:alpha:]]//g' > ../logs/langgraph.log & \
+	sleep 3; \
+	echo "✓ LangGraph server started on localhost:2024"; \
+	echo "Starting Gateway API..."; \
+	cd backend && uv run uvicorn src.gateway.app:app --host 0.0.0.0 --port 8001 > ../logs/gateway.log 2>&1 & \
+	sleep 2; \
+	echo "✓ Gateway API started on localhost:8001"; \
+	echo "Starting Frontend..."; \
+	cd frontend && pnpm run dev > ../logs/frontend.log 2>&1 & \
+	sleep 3; \
+	echo "✓ Frontend started on localhost:3000"; \
+	echo "Starting Nginx reverse proxy..."; \
+	mkdir -p logs && nginx -g 'daemon off;' -c $(PWD)/docker/nginx/nginx.local.conf -p $(PWD) > logs/nginx.log 2>&1 & \
+	sleep 2; \
+	echo "✓ Nginx started on localhost:2026"; \
+    echo "Starting Docker sandbox container...";\
+	docker rm -f deer-flow-sandbox >/dev/null 2>&1 || true; \
+	docker run -d --name deer-flow-sandbox --security-opt seccomp=unconfined --restart unless-stopped -p 8080:8080 enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-sandbox:latest; \
+	sleep 2; \
+	echo "✓ Docker sandbox container started."; \
+    echo ""; \
+	echo "=========================================="; \
+	echo "  DeerFlow is ready!"; \
+	echo "=========================================="; \
+	echo ""; \
+	echo "  🌐 Application: http://localhost:2026"; \
+	echo "  📡 API Gateway: http://localhost:2026/api/*"; \
+	echo "  🤖 LangGraph:   http://localhost:2026/api/langgraph/*"; \
+	echo "  🐳 Sandbox:     http://localhost:8080/*"; \
+	echo ""; \
+	echo "  📋 Logs:"; \
+	echo "     - LangGraph: logs/langgraph.log"; \
+	echo "     - Gateway:   logs/gateway.log"; \
+	echo "     - Frontend:  logs/frontend.log"; \
+	echo "     - Nginx:     logs/nginx.log"; \
+	echo ""; \
+	echo "Press Ctrl+C to stop all services"; \
+	echo ""; \
+	wait
 # Stop all services
 stop:
 	@echo "Stopping all services..."

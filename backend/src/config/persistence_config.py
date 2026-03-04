@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 
+
 class PersistenceConfig(BaseModel):
     """Configuration for the persistence middleware."""
 

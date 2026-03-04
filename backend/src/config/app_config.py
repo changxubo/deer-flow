@@ -9,8 +9,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from src.config.extensions_config import ExtensionsConfig
 from src.config.memory_config import load_memory_config_from_dict
 from src.config.model_config import ModelConfig
-from src.config.sandbox_config import SandboxConfig
 from src.config.persistence_config import PersistenceConfig, load_persistence_config_from_dict
+from src.config.sandbox_config import SandboxConfig
 from src.config.skills_config import SkillsConfig
 from src.config.summarization_config import load_summarization_config_from_dict
 from src.config.title_config import load_title_config_from_dict

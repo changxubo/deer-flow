@@ -1,10 +1,11 @@
 import logging
+
 from langchain.chat_models import BaseChatModel
+from langfuse.langchain import CallbackHandler
 
 from src.config import get_app_config, get_tracing_config, is_tracing_enabled
 from src.reflection import resolve_class
-from langfuse.langchain import CallbackHandler
- 
+
 langfuse_handler = CallbackHandler()
 logger = logging.getLogger(__name__)
 
