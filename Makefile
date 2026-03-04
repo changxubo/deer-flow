@@ -262,6 +262,7 @@ up:
 	sleep 3; \
 	echo "✓ LangGraph server started on localhost:2024"; \
 	echo "Starting Gateway API..."; \
+	
 	cd backend && uv run uvicorn src.gateway.app:app --host 0.0.0.0 --port 8001 > ../logs/gateway.log 2>&1 & \
 	sleep 2; \
 	echo "✓ Gateway API started on localhost:8001"; \
