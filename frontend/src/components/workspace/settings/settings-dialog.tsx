@@ -2,7 +2,6 @@
 
 import {
   BellIcon,
-  InfoIcon,
   PaletteIcon,
   WrenchIcon,
 } from "lucide-react";
@@ -17,10 +16,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LanguageSettingsPage } from "@/components/workspace/settings/language-settings-page";
 import { AppearanceSettingsPage } from "@/components/workspace/settings/appearance-settings-page";
-import { MemorySettingsPage } from "@/components/workspace/settings/memory-settings-page";
 import { NotificationSettingsPage } from "@/components/workspace/settings/notification-settings-page";
-import { SkillSettingsPage } from "@/components/workspace/settings/skill-settings-page";
-import { ToolSettingsPage } from "@/components/workspace/settings/tool-settings-page";
 import { AboutSettingsPage } from "@/components/workspace/settings/about-settings-page";
 import { useI18n } from "@/core/i18n/hooks";
 import { cn } from "@/lib/utils";
@@ -29,11 +25,7 @@ import { cn } from "@/lib/utils";
 type SettingsSection =
   | "appearance"
   | "language"
-  | "memory"
-  | "tools"
-  | "skills"
   | "notification"
-  | "about";
 
 type SettingsDialogProps = React.ComponentProps<typeof Dialog> & {
   defaultSection?: SettingsSection;
@@ -69,14 +61,12 @@ export function SettingsDialog(props: SettingsDialogProps) {
         id: "notification",
         label: t.settings.sections.notification,
         icon: BellIcon,
-      },
-      { id: "about", label: t.settings.sections.about, icon: InfoIcon },
+      }
     ],
     [
       t.settings.sections.appearance,
       t.settings.sections.language,
       t.settings.sections.notification,
-      t.settings.sections.about,
     ],
   );
   return (
@@ -85,7 +75,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
       onOpenChange={(open) => props.onOpenChange?.(open)}
     >
       <DialogContent
-        className="flex h-[75vh] max-h-[calc(100vh-2rem)] flex-col sm:max-w-5xl md:max-w-6xl"
+        className="flex h-[85vh] max-h-[calc(100vh-2rem)] flex-col sm:max-w-3xl md:max-w-4xl"
         aria-describedby={undefined}
       >
         <DialogHeader className="gap-1">
@@ -123,15 +113,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
             <div className="space-y-8 p-6">
               {activeSection === "appearance" && <AppearanceSettingsPage />}
               {activeSection === "language" && <LanguageSettingsPage />}
-              {activeSection === "memory" && <MemorySettingsPage />}
-              {activeSection === "tools" && <ToolSettingsPage />}
-              {activeSection === "skills" && (
-                <SkillSettingsPage
-                  onClose={() => props.onOpenChange?.(false)}
-                />
-              )}
               {activeSection === "notification" && <NotificationSettingsPage />}
-              {activeSection === "about" && <AboutSettingsPage />}
             </div>
           </ScrollArea>
         </div>

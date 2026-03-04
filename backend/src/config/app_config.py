@@ -9,7 +9,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from src.config.extensions_config import ExtensionsConfig
 from src.config.memory_config import load_memory_config_from_dict
 from src.config.model_config import ModelConfig
-from src.config.persistence_config import PersistenceConfig, load_persistence_config_from_dict
 from src.config.sandbox_config import SandboxConfig
 from src.config.skills_config import SkillsConfig
 from src.config.summarization_config import load_summarization_config_from_dict
@@ -28,7 +27,6 @@ class AppConfig(BaseModel):
     tool_groups: list[ToolGroupConfig] = Field(default_factory=list, description="Available tool groups")
     skills: SkillsConfig = Field(default_factory=SkillsConfig, description="Skills configuration")
     extensions: ExtensionsConfig = Field(default_factory=ExtensionsConfig, description="Extensions configuration (MCP servers and skills state)")
-    persistence: "PersistenceConfig" = Field(description="Persistence configuration")
     model_config = ConfigDict(extra="allow", frozen=False)
 
     @classmethod
@@ -88,10 +86,6 @@ class AppConfig(BaseModel):
         # Load memory config if present
         if "memory" in config_data:
             load_memory_config_from_dict(config_data["memory"])
-
-        # Load persistence config if present
-        if "persistence" in config_data:
-            load_persistence_config_from_dict(config_data["persistence"])
 
         # Load extensions config separately (it's in a different file)
         extensions_config = ExtensionsConfig.from_file()
