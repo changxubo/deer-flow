@@ -24,3 +24,11 @@ config.yaml
 # Claude Code settings
 .claude/settings.local.json
 
+skills
+.kiro
+.agents
+.qoder
+.trae
+.kilocode
+.commandcode
+skills-lock.json
