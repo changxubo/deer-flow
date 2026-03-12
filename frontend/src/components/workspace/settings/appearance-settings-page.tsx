@@ -4,7 +4,15 @@ import { MonitorSmartphoneIcon, MoonIcon, SunIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useMemo, type ComponentType, type SVGProps } from "react";
 
-import { enUS, zhCN, type Locale } from "@/core/i18n";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { enUS, isLocale, zhCN, type Locale } from "@/core/i18n";
 import { useI18n } from "@/core/i18n/hooks";
 import { cn } from "@/lib/utils";
 
@@ -69,7 +77,32 @@ export function AppearanceSettingsPage() {
         </div>
       </SettingsSection>
 
-      
+      <Separator />
+
+      <SettingsSection
+        title={t.settings.appearance.languageTitle}
+        description={t.settings.appearance.languageDescription}
+      >
+        <Select
+          value={locale}
+          onValueChange={(value) => {
+            if (isLocale(value)) {
+              changeLocale(value);
+            }
+          }}
+        >
+          <SelectTrigger className="w-[220px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {languageOptions.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </SettingsSection>
     </div>
   );
 }

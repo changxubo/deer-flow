@@ -1,5 +1,7 @@
+import logging
+
 from langchain.agents import create_agent
-from langchain.agents.middleware import PIIMiddleware, SummarizationMiddleware, TodoListMiddleware
+from langchain.agents.middleware import PIIMiddleware, SummarizationMiddleware
 from langchain_core.runnables import RunnableConfig
 from langfuse.langchain import CallbackHandler
 
@@ -10,13 +12,32 @@ from src.agents.middlewares.memory_middleware import MemoryMiddleware
 from src.agents.middlewares.subagent_limit_middleware import SubagentLimitMiddleware
 from src.agents.middlewares.thread_data_middleware import ThreadDataMiddleware
 from src.agents.middlewares.title_middleware import TitleMiddleware
+from src.agents.middlewares.todo_middleware import TodoMiddleware
 from src.agents.middlewares.uploads_middleware import UploadsMiddleware
 from src.agents.middlewares.view_image_middleware import ViewImageMiddleware
 from src.agents.thread_state import ThreadState
+from src.config.agents_config import load_agent_config
 from src.config.app_config import get_app_config
 from src.config.summarization_config import get_summarization_config
 from src.models import create_chat_model
 from src.sandbox.middleware import SandboxMiddleware
+
+logger = logging.getLogger(__name__)
+
+
+def _resolve_model_name(requested_model_name: str | None = None) -> str:
+    """Resolve a runtime model name safely, falling back to default if invalid. Returns None if no models are configured."""
+    app_config = get_app_config()
+    default_model_name = app_config.models[0].name if app_config.models else None
+    if default_model_name is None:
+        raise ValueError("No chat models are configured. Please configure at least one model in config.yaml.")
+
+    if requested_model_name and app_config.get_model_config(requested_model_name):
+        return requested_model_name
+
+    if requested_model_name and requested_model_name != default_model_name:
+        logger.warning(f"Model '{requested_model_name}' not found in config; fallback to default model '{default_model_name}'.")
+    return default_model_name
 
 langfuse_handler = CallbackHandler()
 
@@ -63,14 +84,14 @@ def _create_summarization_middleware() -> SummarizationMiddleware | None:
     return SummarizationMiddleware(**kwargs)
 
 
-def _create_todo_list_middleware(is_plan_mode: bool) -> TodoListMiddleware | None:
+def _create_todo_list_middleware(is_plan_mode: bool) -> TodoMiddleware | None:
     """Create and configure the TodoList middleware.
 
     Args:
         is_plan_mode: Whether to enable plan mode with TodoList middleware.
 
     Returns:
-        TodoListMiddleware instance if plan mode is enabled, None otherwise.
+        TodoMiddleware instance if plan mode is enabled, None otherwise.
     """
     if not is_plan_mode:
         return None
@@ -175,7 +196,7 @@ Being proactive with task management demonstrates thoroughness and ensures all r
 **Remember**: If you only need a few tool calls to complete a task and it's clear what to do, it's better to just do the task directly and NOT use this tool at all.
 """
 
-    return TodoListMiddleware(system_prompt=system_prompt, tool_description=tool_description)
+    return TodoMiddleware(system_prompt=system_prompt, tool_description=tool_description)
 
 
 # ThreadDataMiddleware must be before SandboxMiddleware to ensure thread_id is available
@@ -187,35 +208,38 @@ Being proactive with task management demonstrates thoroughness and ensures all r
 # MemoryMiddleware queues conversation for memory update (after TitleMiddleware)
 # ViewImageMiddleware should be before ClarificationMiddleware to inject image details before LLM
 # ClarificationMiddleware should be last to intercept clarification requests after model calls
-def _build_middlewares(config: RunnableConfig):
-    """Build middleware chain based on runtime configuration."""
-    middlewares = [
-        ThreadDataMiddleware(),
-        UploadsMiddleware(),
-        SandboxMiddleware(),
-        DanglingToolCallMiddleware(),
-    ]
+def _build_middlewares(config: RunnableConfig, model_name: str | None, agent_name: str | None = None):
+    """Build middleware chain based on runtime configuration.
 
-    configurable = config.get("configurable", {})
-    is_plan_mode = configurable.get("is_plan_mode", False)
-    subagent_enabled = configurable.get("subagent_enabled", False)
-    model_name = configurable.get("model_name") or configurable.get("model")
+    Args:
+        config: Runtime configuration containing configurable options like is_plan_mode.
+        agent_name: If provided, MemoryMiddleware will use per-agent memory storage.
 
-    if summarization_middleware := _create_summarization_middleware():
+    Returns:
+        List of middleware instances.
+    """
+    middlewares = [ThreadDataMiddleware(), UploadsMiddleware(), SandboxMiddleware(), DanglingToolCallMiddleware()]
+
+    # Add summarization middleware if enabled
+    summarization_middleware = _create_summarization_middleware()
+    if summarization_middleware is not None:
         middlewares.append(summarization_middleware)
 
     if todo_list_middleware := _create_todo_list_middleware(is_plan_mode):
         middlewares.append(todo_list_middleware)
 
-    middlewares.extend([TitleMiddleware(), MemoryMiddleware()])
+    # Add TitleMiddleware
+    middlewares.append(TitleMiddleware())
 
+    # Add MemoryMiddleware (after TitleMiddleware)
+    middlewares.append(MemoryMiddleware(agent_name=agent_name))
+
+    # Add ViewImageMiddleware only if the current model supports vision.
+    # Use the resolved runtime model_name from make_lead_agent to avoid stale config values.
     app_config = get_app_config()
-    if model_name is None and app_config.models:
-        model_name = app_config.models[0].name
-
-    if model_config := app_config.get_model_config(model_name):
-        if model_config.supports_vision:
-            middlewares.append(ViewImageMiddleware())
+    model_config = app_config.get_model_config(model_name) if model_name else None
+    if model_config is not None and model_config.supports_vision:
+        middlewares.append(ViewImageMiddleware())
 
     if subagent_enabled:
         max_concurrent_subagents = configurable.get("max_concurrent_subagents", 3)
@@ -234,38 +258,78 @@ def _build_middlewares(config: RunnableConfig):
 def make_lead_agent(config: RunnableConfig):
     # Lazy import to avoid circular dependency
     from src.tools import get_available_tools
+    from src.tools.builtins import setup_agent
 
-    configurable = config.get("configurable", {})
-    thinking_enabled = configurable.get("thinking_enabled", True)
-    model_name = configurable.get("model_name") or configurable.get("model")
-    is_plan_mode = configurable.get("is_plan_mode", False)
-    subagent_enabled = configurable.get("subagent_enabled", False)
-    max_concurrent_subagents = configurable.get("max_concurrent_subagents", 3)
+    cfg = config.get("configurable", {})
 
-    print(f"thinking_enabled: {thinking_enabled}, model_name: {model_name}, is_plan_mode: {is_plan_mode}, subagent_enabled: {subagent_enabled}, max_concurrent_subagents: {max_concurrent_subagents}")
+    thinking_enabled = cfg.get("thinking_enabled", True)
+    reasoning_effort = cfg.get("reasoning_effort", None)
+    requested_model_name: str | None = cfg.get("model_name") or cfg.get("model")
+    is_plan_mode = cfg.get("is_plan_mode", False)
+    subagent_enabled = cfg.get("subagent_enabled", False)
+    max_concurrent_subagents = cfg.get("max_concurrent_subagents", 3)
+    is_bootstrap = cfg.get("is_bootstrap", False)
+    agent_name = cfg.get("agent_name")
+
+    agent_config = load_agent_config(agent_name) if not is_bootstrap else None
+    # Custom agent model or fallback to global/default model resolution
+    agent_model_name = agent_config.model if agent_config and agent_config.model else _resolve_model_name()
+
+    # Final model name resolution with request override, then agent config, then global default
+    model_name = requested_model_name or agent_model_name
+
+    app_config = get_app_config()
+    model_config = app_config.get_model_config(model_name) if model_name else None
+
+    if model_config is None:
+        raise ValueError("No chat model could be resolved. Please configure at least one model in config.yaml or provide a valid 'model_name'/'model' in the request.")
+    if thinking_enabled and not model_config.supports_thinking:
+        logger.warning(f"Thinking mode is enabled but model '{model_name}' does not support it; fallback to non-thinking mode.")
+        thinking_enabled = False
+
+    logger.info(
+        "Create Agent(%s) -> thinking_enabled: %s, reasoning_effort: %s, model_name: %s, is_plan_mode: %s, subagent_enabled: %s, max_concurrent_subagents: %s",
+        agent_name or "default",
+        thinking_enabled,
+        reasoning_effort,
+        model_name,
+        is_plan_mode,
+        subagent_enabled,
+        max_concurrent_subagents,
+    )
 
     # Inject run metadata for LangSmith trace tagging
-    if "callbacks" not in config:
-        config["callbacks"] = []
-    existing_callbacks = config["callbacks"] or []
-    config["callbacks"] = [*existing_callbacks, langfuse_handler]
-
     if "metadata" not in config:
         config["metadata"] = {}
-    config["metadata"].update({
-        "model_name": model_name or "default",
-        "thinking_enabled": thinking_enabled,
-        "is_plan_mode": is_plan_mode,
-        "subagent_enabled": subagent_enabled,
-    })
 
-    agent_kwargs = {
-        "model": create_chat_model(name=model_name, thinking_enabled=thinking_enabled),
-        "tools": get_available_tools(model_name=model_name, subagent_enabled=subagent_enabled),
-        "middleware": _build_middlewares(config),
-        "system_prompt": apply_prompt_template(subagent_enabled=subagent_enabled, max_concurrent_subagents=max_concurrent_subagents),
-        "state_schema": ThreadState,
-        "debug": True, 
-    }
+    config["metadata"].update(
+        {
+            "agent_name": agent_name or "default",
+            "model_name": model_name or "default",
+            "thinking_enabled": thinking_enabled,
+            "reasoning_effort": reasoning_effort,
+            "is_plan_mode": is_plan_mode,
+            "subagent_enabled": subagent_enabled,
+        }
+    )
 
-    return create_agent(**agent_kwargs)
+    if is_bootstrap:
+        # Special bootstrap agent with minimal prompt for initial custom agent creation flow
+        system_prompt = apply_prompt_template(subagent_enabled=subagent_enabled, max_concurrent_subagents=max_concurrent_subagents, available_skills=set(["bootstrap"]))
+
+        return create_agent(
+            model=create_chat_model(name=model_name, thinking_enabled=thinking_enabled),
+            tools=get_available_tools(model_name=model_name, subagent_enabled=subagent_enabled) + [setup_agent],
+            middleware=_build_middlewares(config, model_name=model_name),
+            system_prompt=system_prompt,
+            state_schema=ThreadState,
+        )
+
+    # Default lead agent (unchanged behavior)
+    return create_agent(
+        model=create_chat_model(name=model_name, thinking_enabled=thinking_enabled, reasoning_effort=reasoning_effort),
+        tools=get_available_tools(model_name=model_name, groups=agent_config.tool_groups if agent_config else None, subagent_enabled=subagent_enabled),
+        middleware=_build_middlewares(config, model_name=model_name, agent_name=agent_name),
+        system_prompt=apply_prompt_template(subagent_enabled=subagent_enabled, max_concurrent_subagents=max_concurrent_subagents, agent_name=agent_name),
+        state_schema=ThreadState,
+    )

@@ -11,6 +11,7 @@ DeerFlow is a LangGraph-based AI super agent system with a full-stack architectu
 - **Gateway API** (port 8001): REST API for models, MCP, skills, memory, artifacts, and uploads
 - **Frontend** (port 3000): Next.js web interface
 - **Nginx** (port 2026): Unified reverse proxy entry point
+- **Provisioner** (port 8002, optional in Docker dev): Started only when sandbox is configured for provisioner/Kubernetes mode
 
 **Project Structure**:
 ```
@@ -46,7 +47,8 @@ deer-flow/
 │   │   ├── config/            # Configuration system (app, model, sandbox, tool, etc.)
 │   │   ├── community/         # Community tools (tavily, jina_ai, firecrawl, image_search, aio_sandbox)
 │   │   ├── reflection/        # Dynamic module loading (resolve_variable, resolve_class)
-│   │   └── utils/             # Utilities (network, readability)
+│   │   ├── utils/             # Utilities (network, readability)
+│   │   └── client.py          # Embedded Python client (DeerFlowClient)
 │   ├── tests/                 # Test suite
 │   └── docs/                  # Documentation
 ├── frontend/                   # Next.js frontend application
@@ -72,7 +74,7 @@ When making code changes, you MUST update the relevant documentation:
 ```bash
 make check      # Check system requirements
 make install    # Install all dependencies (frontend + backend)
-make dev        # Start all services (LangGraph + Gateway + Frontend + Nginx)
+make dev        # Start all services (LangGraph + Gateway + Frontend + Nginx), with config.yaml preflight
 make stop       # Stop all services
 ```
 
@@ -81,9 +83,16 @@ make stop       # Stop all services
 make install    # Install backend dependencies
 make dev        # Run LangGraph server only (port 2024)
 make gateway    # Run Gateway API only (port 8001)
+make test       # Run all backend tests
 make lint       # Lint with ruff
 make format     # Format code with ruff
 ```
+
+Regression tests related to Docker/provisioner behavior:
+- `tests/test_docker_sandbox_mode_detection.py` (mode detection from `config.yaml`)
+- `tests/test_provisioner_kubeconfig.py` (kubeconfig file/directory handling)
+
+CI runs these regression tests for every pull request via [.github/workflows/backend-unit-tests.yml](../.github/workflows/backend-unit-tests.yml).
 
 ## Architecture
 
@@ -215,13 +224,14 @@ Proxied through nginx: `/api/langgraph/*` → LangGraph, all other `/api/*` → 
 - **Lazy initialization**: Tools loaded on first use via `get_cached_mcp_tools()`
 - **Cache invalidation**: Detects config file changes via mtime comparison
 - **Transports**: stdio (command-based), SSE, HTTP
+- **OAuth (HTTP/SSE)**: Supports token endpoint flows (`client_credentials`, `refresh_token`) with automatic token refresh + Authorization header injection
 - **Runtime updates**: Gateway API saves to extensions_config.json; LangGraph detects via mtime
 
 ### Skills System (`src/skills/`)
 
 - **Location**: `deer-flow/skills/{public,custom}/`
 - **Format**: Directory with `SKILL.md` (YAML frontmatter: name, description, license, allowed-tools)
-- **Loading**: `load_skills()` scans directories, parses SKILL.md, reads enabled state from extensions_config.json
+- **Loading**: `load_skills()` recursively scans `skills/{public,custom}` for `SKILL.md`, parses metadata, and reads enabled state from extensions_config.json
 - **Injection**: Enabled skills listed in agent system prompt with container paths
 - **Installation**: `POST /api/skills/install` extracts .skill ZIP archive to custom/ directory
 
@@ -231,6 +241,33 @@ Proxied through nginx: `/api/langgraph/*` → LangGraph, all other `/api/*` → 
 - Supports `thinking_enabled` flag with per-model `when_thinking_enabled` overrides
 - Supports `supports_vision` flag for image understanding models
 - Config values starting with `$` resolved as environment variables
+- Missing provider modules surface actionable install hints from reflection resolvers (for example `uv add langchain-google-genai`)
+
+### IM Channels System (`src/channels/`)
+
+Bridges external messaging platforms (Feishu, Slack, Telegram) to the DeerFlow agent via the LangGraph Server.
+
+**Architecture**: Channels communicate with the LangGraph Server through `langgraph-sdk` HTTP client (same as the frontend), ensuring threads are created and managed server-side.
+
+**Components**:
+- `message_bus.py` - Async pub/sub hub (`InboundMessage` -> queue -> dispatcher; `OutboundMessage` -> callbacks -> channels)
+- `store.py` - JSON-file persistence mapping `channel_name:chat_id[:topic_id]` -> `thread_id` (keys are `channel:chat` for root conversations and `channel:chat:topic` for threaded conversations)
+- `manager.py` - Core dispatcher: creates threads via `client.threads.create()`, sends messages via `client.runs.wait()`, routes commands
+- `base.py` - Abstract `Channel` base class (start/stop/send lifecycle)
+- `service.py` - Manages lifecycle of all configured channels from `config.yaml`
+- `slack.py` / `feishu.py` / `telegram.py` - Platform-specific implementations
+
+**Message Flow**:
+1. External platform -> Channel impl -> `MessageBus.publish_inbound()`
+2. `ChannelManager._dispatch_loop()` consumes from queue
+3. For chat: look up/create thread on LangGraph Server -> `runs.wait()` -> extract response -> publish outbound
+4. For commands (`/new`, `/status`, `/models`, `/memory`, `/help`): handle locally or query Gateway API
+5. Outbound -> channel callbacks -> platform reply
+
+**Configuration** (`config.yaml` -> `channels`):
+- `langgraph_url` - LangGraph Server URL (default: `http://localhost:2024`)
+- `gateway_url` - Gateway API URL for auxiliary commands (default: `http://localhost:8001`)
+- Per-channel configs: `feishu` (app_id, app_secret), `slack` (bot_token, app_token), `telegram` (bot_token)
 
 ### Memory System (`src/agents/memory/`)
 
@@ -278,12 +315,63 @@ Proxied through nginx: `/api/langgraph/*` → LangGraph, all other `/api/*` → 
 - `memory` - Memory system (enabled, storage_path, debounce_seconds, model_name, max_facts, fact_confidence_threshold, injection_enabled, max_injection_tokens)
 
 **`extensions_config.json`**:
-- `mcpServers` - Map of server name → config (enabled, type, command, args, env, url, headers, description)
+- `mcpServers` - Map of server name → config (enabled, type, command, args, env, url, headers, oauth, description)
 - `skills` - Map of skill name → state (enabled)
 
-Both can be modified at runtime via Gateway API endpoints.
+Both can be modified at runtime via Gateway API endpoints or `DeerFlowClient` methods.
+
+### Embedded Client (`src/client.py`)
+
+`DeerFlowClient` provides direct in-process access to all DeerFlow capabilities without HTTP services. All return types align with the Gateway API response schemas, so consumer code works identically in HTTP and embedded modes.
+
+**Architecture**: Imports the same `src/` modules that LangGraph Server and Gateway API use. Shares the same config files and data directories. No FastAPI dependency.
+
+**Agent Conversation** (replaces LangGraph Server):
+- `chat(message, thread_id)` — synchronous, returns final text
+- `stream(message, thread_id)` — yields `StreamEvent` aligned with LangGraph SSE protocol:
+  - `"values"` — full state snapshot (title, messages, artifacts)
+  - `"messages-tuple"` — per-message update (AI text, tool calls, tool results)
+  - `"end"` — stream finished
+- Agent created lazily via `create_agent()` + `_build_middlewares()`, same as `make_lead_agent`
+- Supports `checkpointer` parameter for state persistence across turns
+- `reset_agent()` forces agent recreation (e.g. after memory or skill changes)
+
+**Gateway Equivalent Methods** (replaces Gateway API):
+
+| Category | Methods | Return format |
+|----------|---------|---------------|
+| Models | `list_models()`, `get_model(name)` | `{"models": [...]}`, `{name, display_name, ...}` |
+| MCP | `get_mcp_config()`, `update_mcp_config(servers)` | `{"mcp_servers": {...}}` |
+| Skills | `list_skills()`, `get_skill(name)`, `update_skill(name, enabled)`, `install_skill(path)` | `{"skills": [...]}` |
+| Memory | `get_memory()`, `reload_memory()`, `get_memory_config()`, `get_memory_status()` | dict |
+| Uploads | `upload_files(thread_id, files)`, `list_uploads(thread_id)`, `delete_upload(thread_id, filename)` | `{"success": true, "files": [...]}`, `{"files": [...], "count": N}` |
+| Artifacts | `get_artifact(thread_id, path)` → `(bytes, mime_type)` | tuple |
+
+**Key difference from Gateway**: Upload accepts local `Path` objects instead of HTTP `UploadFile`, rejects directory paths before copying, and reuses a single worker when document conversion must run inside an active event loop. Artifact returns `(bytes, mime_type)` instead of HTTP Response. `update_mcp_config()` and `update_skill()` automatically invalidate the cached agent.
+
+**Tests**: `tests/test_client.py` (77 unit tests including `TestGatewayConformance`), `tests/test_client_live.py` (live integration tests, requires config.yaml)
+
+**Gateway Conformance Tests** (`TestGatewayConformance`): Validate that every dict-returning client method conforms to the corresponding Gateway Pydantic response model. Each test parses the client output through the Gateway model — if Gateway adds a required field that the client doesn't provide, Pydantic raises `ValidationError` and CI catches the drift. Covers: `ModelsListResponse`, `ModelResponse`, `SkillsListResponse`, `SkillResponse`, `SkillInstallResponse`, `McpConfigResponse`, `UploadResponse`, `MemoryConfigResponse`, `MemoryStatusResponse`.
 
 ## Development Workflow
+
+### Test-Driven Development (TDD) — MANDATORY
+
+**Every new feature or bug fix MUST be accompanied by unit tests. No exceptions.**
+
+- Write tests in `backend/tests/` following the existing naming convention `test_<feature>.py`
+- Run the full suite before and after your change: `make test`
+- Tests must pass before a feature is considered complete
+- For lightweight config/utility modules, prefer pure unit tests with no external dependencies
+- If a module causes circular import issues in tests, add a `sys.modules` mock in `tests/conftest.py` (see existing example for `src.subagents.executor`)
+
+```bash
+# Run all tests
+make test
+
+# Run a specific test file
+PYTHONPATH=. uv run pytest tests/test_<feature>.py -v
+```
 
 ### Running the Full Application
 
@@ -330,6 +418,8 @@ When using `make dev` from root, the frontend automatically connects through ngi
 Multi-file upload with automatic document conversion:
 - Endpoint: `POST /api/threads/{thread_id}/uploads`
 - Supports: PDF, PPT, Excel, Word documents (converted via `markitdown`)
+- Rejects directory inputs before copying so uploads stay all-or-nothing
+- Reuses one conversion worker per request when called from an active event loop
 - Files stored in thread-isolated directories
 - Agent receives uploaded file list via `UploadsMiddleware`
 

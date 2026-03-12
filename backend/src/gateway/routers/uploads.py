@@ -1,13 +1,12 @@
 """Upload router for handling file uploads."""
 
 import logging
-import os
 from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from src.agents.middlewares.thread_data_middleware import THREAD_DATA_BASE_DIR
+from src.config.paths import VIRTUAL_PATH_PREFIX, get_paths
 from src.sandbox.sandbox_provider import get_sandbox_provider
 
 logger = logging.getLogger(__name__)
@@ -43,7 +42,7 @@ def get_uploads_dir(thread_id: str) -> Path:
     Returns:
         Path to the uploads directory.
     """
-    base_dir = Path(os.getcwd()) / THREAD_DATA_BASE_DIR / thread_id / "user-data" / "uploads"
+    base_dir = get_paths().sandbox_uploads_dir(thread_id)
     base_dir.mkdir(parents=True, exist_ok=True)
     return base_dir
 
@@ -95,6 +94,7 @@ async def upload_files(
         raise HTTPException(status_code=400, detail="No files provided")
 
     uploads_dir = get_uploads_dir(thread_id)
+    paths = get_paths()
     uploaded_files = []
 
     sandbox_provider = get_sandbox_provider()
@@ -106,34 +106,49 @@ async def upload_files(
             continue
 
         try:
-            # Save the original file
-            file_path = uploads_dir / file.filename
+            # Normalize filename to prevent path traversal
+            safe_filename = Path(file.filename).name
+            if not safe_filename or safe_filename in {".", ".."} or "/" in safe_filename or "\\" in safe_filename:
+                logger.warning(f"Skipping file with unsafe filename: {file.filename!r}")
+                continue
+
             content = await file.read()
+            file_path = uploads_dir / safe_filename
+            file_path.write_bytes(content)
 
             # Build relative path from backend root
-            relative_path = f".deer-flow/threads/{thread_id}/user-data/uploads/{file.filename}"
-            virtual_path = f"/mnt/user-data/uploads/{file.filename}"
-            sandbox.update_file(virtual_path, content)
+            relative_path = str(paths.sandbox_uploads_dir(thread_id) / safe_filename)
+            virtual_path = f"{VIRTUAL_PATH_PREFIX}/uploads/{safe_filename}"
+
+            # Keep local sandbox source of truth in thread-scoped host storage.
+            # For non-local sandboxes, also sync to virtual path for runtime visibility.
+            if sandbox_id != "local":
+                sandbox.update_file(virtual_path, content)
 
             file_info = {
-                "filename": file.filename,
+                "filename": safe_filename,
                 "size": str(len(content)),
                 "path": relative_path,  # Actual filesystem path (relative to backend/)
                 "virtual_path": virtual_path,  # Path for Agent in sandbox
-                "artifact_url": f"/api/threads/{thread_id}/artifacts/mnt/user-data/uploads/{file.filename}",  # HTTP URL
+                "artifact_url": f"/api/threads/{thread_id}/artifacts/mnt/user-data/uploads/{safe_filename}",  # HTTP URL
             }
 
-            logger.info(f"Saved file: {file.filename} ({len(content)} bytes) to {relative_path}")
+            logger.info(f"Saved file: {safe_filename} ({len(content)} bytes) to {relative_path}")
 
             # Check if file should be converted to markdown
             file_ext = file_path.suffix.lower()
             if file_ext in CONVERTIBLE_EXTENSIONS:
                 md_path = await convert_file_to_markdown(file_path)
                 if md_path:
-                    md_relative_path = f".deer-flow/threads/{thread_id}/user-data/uploads/{md_path.name}"
+                    md_relative_path = str(paths.sandbox_uploads_dir(thread_id) / md_path.name)
+                    md_virtual_path = f"{VIRTUAL_PATH_PREFIX}/uploads/{md_path.name}"
+
+                    if sandbox_id != "local":
+                        sandbox.update_file(md_virtual_path, md_path.read_bytes())
+
                     file_info["markdown_file"] = md_path.name
                     file_info["markdown_path"] = md_relative_path
-                    file_info["markdown_virtual_path"] = f"/mnt/user-data/uploads/{md_path.name}"
+                    file_info["markdown_virtual_path"] = md_virtual_path
                     file_info["markdown_artifact_url"] = f"/api/threads/{thread_id}/artifacts/mnt/user-data/uploads/{md_path.name}"
 
             uploaded_files.append(file_info)
@@ -168,13 +183,13 @@ async def list_uploaded_files(thread_id: str) -> dict:
     for file_path in sorted(uploads_dir.iterdir()):
         if file_path.is_file():
             stat = file_path.stat()
-            relative_path = f".deer-flow/threads/{thread_id}/user-data/uploads/{file_path.name}"
+            relative_path = str(get_paths().sandbox_uploads_dir(thread_id) / file_path.name)
             files.append(
                 {
                     "filename": file_path.name,
                     "size": stat.st_size,
-                    "path": relative_path,  # Actual filesystem path (relative to backend/)
-                    "virtual_path": f"/mnt/user-data/uploads/{file_path.name}",  # Path for Agent in sandbox
+                    "path": relative_path,  # Actual filesystem path
+                    "virtual_path": f"{VIRTUAL_PATH_PREFIX}/uploads/{file_path.name}",  # Path for Agent in sandbox
                     "artifact_url": f"/api/threads/{thread_id}/artifacts/mnt/user-data/uploads/{file_path.name}",  # HTTP URL
                     "extension": file_path.suffix,
                     "modified": stat.st_mtime,

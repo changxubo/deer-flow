@@ -92,9 +92,13 @@ Content-Type: application/json
       "is_plan_mode": false
     }
   },
-  "stream_mode": ["values", "messages"]
+  "stream_mode": ["values", "messages-tuple", "custom"]
 }
 ```
+
+**Stream Mode Compatibility:**
+- Use: `values`, `messages-tuple`, `custom`, `updates`, `events`, `debug`, `tasks`, `checkpoints`
+- Do not use: `tools` (deprecated/invalid in current `langgraph-api` and will trigger schema validation errors)
 
 **Configurable Options:**
 - `model_name` (string): Override the default model
@@ -503,6 +507,8 @@ All APIs return errors in a consistent format:
 
 Currently, DeerFlow does not implement authentication. All APIs are accessible without credentials.
 
+Note: This is about DeerFlow API authentication. MCP outbound connections can still use OAuth for configured HTTP/SSE MCP servers.
+
 For production deployments, it is recommended to:
 1. Use Nginx for basic auth or OAuth integration
 2. Deploy behind a VPN or private network
@@ -553,7 +559,7 @@ async for event in client.runs.stream(
     "lead_agent",
     input={"messages": [{"role": "user", "content": "Hello"}]},
     config={"configurable": {"model_name": "gpt-4"}},
-    stream_mode=["values", "messages"],
+    stream_mode=["values", "messages-tuple", "custom"],
 ):
     print(event)
 ```

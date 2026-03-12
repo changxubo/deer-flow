@@ -1,5 +1,8 @@
 # 🦌 DeerFlow - 2.0
 
+<a href="https://trendshift.io/repositories/14699" target="_blank"><img src="https://trendshift.io/api/badge/repositories/14699" alt="bytedance%2Fdeer-flow | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+> On February 28th, 2026, DeerFlow claimed the 🏆 #1 spot on GitHub Trending following the launch of version 2. Thanks a million to our incredible community — you made this happen! 💪🔥
+
 DeerFlow (**D**eep **E**xploration and **E**fficient **R**esearch **Flow**) is an open-source **super agent harness** that orchestrates **sub-agents**, **memory**, and **sandboxes** to do almost anything — powered by **extensible skills**.
 
 https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
@@ -7,31 +10,55 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 > [!NOTE]
 > **DeerFlow 2.0 is a ground-up rewrite.** It shares no code with v1. If you're looking for the original Deep Research framework, it's maintained on the [`1.x` branch](https://github.com/bytedance/deer-flow/tree/main-1.x) — contributions there are still welcome. Active development has moved to 2.0.
 
-## Offiical Website
+## Official Website
 
 Learn more and see **real demos** on our official website.
 
 **[deerflow.tech](https://deerflow.tech/)**
 
+## InfoQuest
+
+DeerFlow has newly integrated the intelligent search and crawling toolset independently developed by BytePlus--[InfoQuest (supports free online experience)](https://docs.byteplus.com/en/docs/InfoQuest/What_is_Info_Quest)
+
+<a href="https://docs.byteplus.com/en/docs/InfoQuest/What_is_Info_Quest" target="_blank">
+  <img 
+    src="https://sf16-sg.tiktokcdn.com/obj/eden-sg/hubseh7bsbps/20251208-160108.png"   alt="InfoQuest_banner" 
+  />
+</a>
+
 ---
 
 ## Table of Contents
 
-- [Quick Start](#quick-start)
-- [Sandbox Mode](#sandbox-mode)
-- [From Deep Research to Super Agent Harness](#from-deep-research-to-super-agent-harness)
-- [Core Features](#core-features)
-  - [Skills & Tools](#skills--tools)
-  - [Sub-Agents](#sub-agents)
-  - [Sandbox & File System](#sandbox--file-system)
-  - [Context Engineering](#context-engineering)
-  - [Long-Term Memory](#long-term-memory)
-- [Recommended Models](#recommended-models)
-- [Documentation](#documentation)
-- [Contributing](#contributing)
-- [License](#license)
-- [Acknowledgments](#acknowledgments)
-- [Star History](#star-history)
+- [🦌 DeerFlow - 2.0](#-deerflow---20)
+  - [Official Website](#official-website)
+  - [InfoQuest](#infoquest)
+  - [Table of Contents](#table-of-contents)
+  - [Quick Start](#quick-start)
+    - [Configuration](#configuration)
+    - [Running the Application](#running-the-application)
+      - [Option 1: Docker (Recommended)](#option-1-docker-recommended)
+      - [Option 2: Local Development](#option-2-local-development)
+    - [Advanced](#advanced)
+      - [Sandbox Mode](#sandbox-mode)
+      - [MCP Server](#mcp-server)
+    - [IM Channels](#im-channels)
+  - [From Deep Research to Super Agent Harness](#from-deep-research-to-super-agent-harness)
+  - [Core Features](#core-features)
+    - [Skills \& Tools](#skills--tools)
+      - [Claude Code Integration](#claude-code-integration)
+    - [Sub-Agents](#sub-agents)
+    - [Sandbox \& File System](#sandbox--file-system)
+    - [Context Engineering](#context-engineering)
+    - [Long-Term Memory](#long-term-memory)
+  - [Recommended Models](#recommended-models)
+  - [Embedded Python Client](#embedded-python-client)
+  - [Documentation](#documentation)
+  - [Contributing](#contributing)
+  - [License](#license)
+  - [Acknowledgments](#acknowledgments)
+    - [Key Contributors](#key-contributors)
+  - [Star History](#star-history)
 
 ## Quick Start
 
@@ -69,6 +96,7 @@ Learn more and see **real demos** on our official website.
        temperature: 0.7                  # Sampling temperature
    ```
 
+  
 4. **Set API keys for your configured model(s)**
 
    Choose one of the following methods:
@@ -80,6 +108,7 @@ Learn more and see **real demos** on our official website.
    TAVILY_API_KEY=your-tavily-api-key
    OPENAI_API_KEY=your-openai-api-key
    # Add other provider keys as needed
+   INFOQUEST_API_KEY=your-infoquest-api-key
    ```
 
 - Option B: Export environment variables in your shell
@@ -105,8 +134,10 @@ The fastest way to get started with a consistent environment:
 1. **Initialize and start**:
    ```bash
    make docker-init    # Pull sandbox image (Only once or when image updates)
-   make docker-start   # Start all services and watch for code changes
+   make docker-start   # Start services (auto-detects sandbox mode from config.yaml)
    ```
+
+   `make docker-start` now starts `provisioner` only when `config.yaml` uses provisioner mode (`sandbox.use: src.community.aio_sandbox:AioSandboxProvider` with `provisioner_url`).
 
 2. **Access**: http://localhost:2026
 
@@ -116,23 +147,30 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed Docker development guide.
 
 If you prefer running services locally:
 
+Prerequisite: complete the "Configuration" steps above first (`make config` and model API keys). `make dev` requires a valid configuration file (defaults to `config.yaml` in the project root; can be overridden via `DEER_FLOW_CONFIG_PATH`).
+
 1. **Check prerequisites**:
    ```bash
    make check  # Verifies Node.js 22+, pnpm, uv, nginx
    ```
 
-2. **(Optional) Pre-pull sandbox image**:
+2. **Install dependencies**:
+   ```bash
+   make install  # Install backend + frontend dependencies
+   ```
+
+3. **(Optional) Pre-pull sandbox image**:
    ```bash
    # Recommended if using Docker/Container-based sandbox
    make setup-sandbox
    ```
 
-3. **Start services**:
+4. **Start services**:
    ```bash
    make dev
    ```
 
-4. **Access**: http://localhost:2026
+5. **Access**: http://localhost:2026
 
 ### Advanced
 #### Sandbox Mode
@@ -142,12 +180,124 @@ DeerFlow supports multiple sandbox execution modes:
 - **Docker Execution** (runs sandbox code in isolated Docker containers)
 - **Docker Execution with Kubernetes** (runs sandbox code in Kubernetes pods via provisioner service)
 
+For Docker development, service startup follows `config.yaml` sandbox mode. In Local/Docker modes, `provisioner` is not started.
+
 See the [Sandbox Configuration Guide](backend/docs/CONFIGURATION.md#sandbox) to configure your preferred mode.
 
 #### MCP Server
 
 DeerFlow supports configurable MCP servers and skills to extend its capabilities.
+For HTTP/SSE MCP servers, OAuth token flows are supported (`client_credentials`, `refresh_token`).
 See the [MCP Server Guide](backend/docs/MCP_SERVER.md) for detailed instructions.
+
+#### IM Channels
+
+DeerFlow supports receiving tasks from messaging apps. Channels auto-start when configured — no public IP required for any of them.
+
+| Channel | Transport | Difficulty |
+|---------|-----------|------------|
+| Telegram | Bot API (long-polling) | Easy |
+| Slack | Socket Mode | Moderate |
+| Feishu / Lark | WebSocket | Moderate |
+
+**Configuration in `config.yaml`:**
+
+```yaml
+channels:
+  # LangGraph Server URL (default: http://localhost:2024)
+  langgraph_url: http://localhost:2024
+  # Gateway API URL (default: http://localhost:8001)
+  gateway_url: http://localhost:8001
+
+  # Optional: global session defaults for all mobile channels
+  session:
+    assistant_id: lead_agent
+    config:
+      recursion_limit: 100
+    context:
+      thinking_enabled: true
+      is_plan_mode: false
+      subagent_enabled: false
+
+  feishu:
+    enabled: true
+    app_id: $FEISHU_APP_ID
+    app_secret: $FEISHU_APP_SECRET
+
+  slack:
+    enabled: true
+    bot_token: $SLACK_BOT_TOKEN     # xoxb-...
+    app_token: $SLACK_APP_TOKEN     # xapp-... (Socket Mode)
+    allowed_users: []               # empty = allow all
+
+  telegram:
+    enabled: true
+    bot_token: $TELEGRAM_BOT_TOKEN
+    allowed_users: []               # empty = allow all
+
+    # Optional: per-channel / per-user session settings
+    session:
+      assistant_id: mobile_agent
+      context:
+        thinking_enabled: false
+      users:
+        "123456789":
+          assistant_id: vip_agent
+          config:
+            recursion_limit: 150
+          context:
+            thinking_enabled: true
+            subagent_enabled: true
+```
+
+Set the corresponding API keys in your `.env` file:
+
+```bash
+# Telegram
+TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrSTUvwxYZ
+
+# Slack
+SLACK_BOT_TOKEN=xoxb-...
+SLACK_APP_TOKEN=xapp-...
+
+# Feishu / Lark
+FEISHU_APP_ID=cli_xxxx
+FEISHU_APP_SECRET=your_app_secret
+```
+
+**Telegram Setup**
+
+1. Chat with [@BotFather](https://t.me/BotFather), send `/newbot`, and copy the HTTP API token.
+2. Set `TELEGRAM_BOT_TOKEN` in `.env` and enable the channel in `config.yaml`.
+
+**Slack Setup**
+
+1. Create a Slack App at [api.slack.com/apps](https://api.slack.com/apps) → Create New App → From scratch.
+2. Under **OAuth & Permissions**, add Bot Token Scopes: `app_mentions:read`, `chat:write`, `im:history`, `im:read`, `im:write`, `files:write`.
+3. Enable **Socket Mode** → generate an App-Level Token (`xapp-…`) with `connections:write` scope.
+4. Under **Event Subscriptions**, subscribe to bot events: `app_mention`, `message.im`.
+5. Set `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN` in `.env` and enable the channel in `config.yaml`.
+
+**Feishu / Lark Setup**
+
+1. Create an app on [Feishu Open Platform](https://open.feishu.cn/) → enable **Bot** capability.
+2. Add permissions: `im:message`, `im:message.p2p_msg:readonly`, `im:resource`.
+3. Under **Events**, subscribe to `im.message.receive_v1` and select **Long Connection** mode.
+4. Copy the App ID and App Secret. Set `FEISHU_APP_ID` and `FEISHU_APP_SECRET` in `.env` and enable the channel in `config.yaml`.
+
+**Commands**
+
+Once a channel is connected, you can interact with DeerFlow directly from the chat:
+
+| Command | Description |
+|---------|-------------|
+| `/new` | Start a new conversation |
+| `/status` | Show current thread info |
+| `/models` | List available models |
+| `/memory` | View memory |
+| `/help` | Show help |
+
+> Messages without a command prefix are treated as regular chat — DeerFlow creates a thread and responds conversationally.
 
 ## From Deep Research to Super Agent Harness
 
@@ -185,6 +335,35 @@ Tools follow the same philosophy. DeerFlow comes with a core toolset — web sea
 /mnt/skills/custom
 └── your-custom-skill/SKILL.md      ← yours
 ```
+
+#### Claude Code Integration
+
+The `claude-to-deerflow` skill lets you interact with a running DeerFlow instance directly from [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Send research tasks, check status, manage threads — all without leaving the terminal.
+
+**Install the skill**:
+
+```bash
+npx skills add https://github.com/bytedance/deer-flow --skill claude-to-deerflow
+```
+
+Then make sure DeerFlow is running (default at `http://localhost:2026`) and use the `/claude-to-deerflow` command in Claude Code.
+
+**What you can do**:
+- Send messages to DeerFlow and get streaming responses
+- Choose execution modes: flash (fast), standard, pro (planning), ultra (sub-agents)
+- Check DeerFlow health, list models/skills/agents
+- Manage threads and conversation history
+- Upload files for analysis
+
+**Environment variables** (optional, for custom endpoints):
+
+```bash
+DEERFLOW_URL=http://localhost:2026            # Unified proxy base URL
+DEERFLOW_GATEWAY_URL=http://localhost:2026    # Gateway API
+DEERFLOW_LANGGRAPH_URL=http://localhost:2026/api/langgraph  # LangGraph API
+```
+
+See [`skills/public/claude-to-deerflow/SKILL.md`](skills/public/claude-to-deerflow/SKILL.md) for the full API reference.
 
 ### Sub-Agents
 
@@ -231,6 +410,32 @@ DeerFlow is model-agnostic — it works with any LLM that implements the OpenAI-
 - **Multimodal inputs** for image understanding and video comprehension
 - **Strong tool-use** for reliable function calling and structured outputs
 
+## Embedded Python Client
+
+DeerFlow can be used as an embedded Python library without running the full HTTP services. The `DeerFlowClient` provides direct in-process access to all agent and Gateway capabilities, returning the same response schemas as the HTTP Gateway API:
+
+```python
+from src.client import DeerFlowClient
+
+client = DeerFlowClient()
+
+# Chat
+response = client.chat("Analyze this paper for me", thread_id="my-thread")
+
+# Streaming (LangGraph SSE protocol: values, messages-tuple, end)
+for event in client.stream("hello"):
+    if event.type == "messages-tuple" and event.data.get("type") == "ai":
+        print(event.data["content"])
+
+# Configuration & management — returns Gateway-aligned dicts
+models = client.list_models()        # {"models": [...]}
+skills = client.list_skills()        # {"skills": [...]}
+client.update_skill("web-search", enabled=True)
+client.upload_files("thread-1", ["./report.pdf"])  # {"success": True, "files": [...]}
+```
+
+All dict-returning methods are validated against Gateway Pydantic response models in CI (`TestGatewayConformance`), ensuring the embedded client stays in sync with the HTTP API schemas. See `backend/src/client.py` for full API documentation.
+
 ## Documentation
 
 - [Contributing Guide](CONTRIBUTING.md) - Development environment setup and workflow
@@ -241,6 +446,8 @@ DeerFlow is model-agnostic — it works with any LLM that implements the OpenAI-
 ## Contributing
 
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, workflow, and guidelines.
+
+Regression coverage includes Docker sandbox mode detection and provisioner kubeconfig-path handling tests in `backend/tests/`.
 
 ## License
 

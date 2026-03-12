@@ -1,18 +1,25 @@
 {
   "mcpServers": {
     "filesystem": {
-      "enabled": true,
+      "enabled": false,
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/allowed/files"],
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/path/to/allowed/files"
+      ],
       "env": {},
       "description": "Provides filesystem access within allowed directories"
     },
     "github": {
-      "enabled": true,
+      "enabled": false,
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
       "env": {
         "GITHUB_TOKEN": "$GITHUB_TOKEN"
       },
@@ -22,33 +29,14 @@
       "enabled": false,
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://localhost/mydb"],
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://localhost/mydb"
+      ],
       "env": {},
       "description": "PostgreSQL database access"
-    },
-    "my-sse-server": {                                                                                                                                       
-        "type": "sse",                                                                                                                                         
-        "url": "https://api.example.com/mcp",                                                                                                                  
-        "headers": {                                                                                                                                           
-          "Authorization": "Bearer $API_TOKEN",                                                                                                                
-          "X-Custom-Header": "value"                                                                                                                           
-        }                                                                                                                                                      
-    },
-    "my-http-server": {                                                                                                                                       
-        "type": "http",                                                                                                                                         
-        "url": "https://api.example.com/mcp",                                                                                                                  
-        "headers": {                                                                                                                                           
-          "Authorization": "Bearer $API_TOKEN",                                                                                                                
-          "X-Custom-Header": "value"                                                                                                                           
-        }                                                                                                                                                      
-    }  
-  },
-  "skills": {
-    "pdf-processing": {
-      "enabled": true
-    },
-    "frontend-design": {
-      "enabled": true
     }
-  }
+  },
+  "skills": {}
 }

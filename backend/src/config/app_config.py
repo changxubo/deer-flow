@@ -6,11 +6,13 @@ import yaml
 from dotenv import load_dotenv
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.config.checkpointer_config import CheckpointerConfig, load_checkpointer_config_from_dict
 from src.config.extensions_config import ExtensionsConfig
 from src.config.memory_config import load_memory_config_from_dict
 from src.config.model_config import ModelConfig
 from src.config.sandbox_config import SandboxConfig
 from src.config.skills_config import SkillsConfig
+from src.config.subagents_config import load_subagents_config_from_dict
 from src.config.summarization_config import load_summarization_config_from_dict
 from src.config.title_config import load_title_config_from_dict
 from src.config.tool_config import ToolConfig, ToolGroupConfig
@@ -28,6 +30,7 @@ class AppConfig(BaseModel):
     skills: SkillsConfig = Field(default_factory=SkillsConfig, description="Skills configuration")
     extensions: ExtensionsConfig = Field(default_factory=ExtensionsConfig, description="Extensions configuration (MCP servers and skills state)")
     model_config = ConfigDict(extra="allow", frozen=False)
+    checkpointer: CheckpointerConfig | None = Field(default=None, description="Checkpointer configuration")
 
     @classmethod
     def resolve_config_path(cls, config_path: str | None = None) -> Path:
@@ -71,7 +74,7 @@ class AppConfig(BaseModel):
             AppConfig: The loaded config.
         """
         resolved_path = cls.resolve_config_path(config_path)
-        with open(resolved_path) as f:
+        with open(resolved_path, encoding="utf-8") as f:
             config_data = yaml.safe_load(f)
         config_data = cls.resolve_env_variables(config_data)
 
@@ -86,6 +89,14 @@ class AppConfig(BaseModel):
         # Load memory config if present
         if "memory" in config_data:
             load_memory_config_from_dict(config_data["memory"])
+
+        # Load subagents config if present
+        if "subagents" in config_data:
+            load_subagents_config_from_dict(config_data["subagents"])
+
+        # Load checkpointer config if present
+        if "checkpointer" in config_data:
+            load_checkpointer_config_from_dict(config_data["checkpointer"])
 
         # Load extensions config separately (it's in a different file)
         extensions_config = ExtensionsConfig.from_file()
@@ -108,7 +119,10 @@ class AppConfig(BaseModel):
         """
         if isinstance(config, str):
             if config.startswith("$"):
-                return os.getenv(config[1:], config)
+                env_value = os.getenv(config[1:])
+                if env_value is None:
+                    raise ValueError(f"Environment variable {config[1:]} not found for config value {config}")
+                return env_value
             return config
         elif isinstance(config, dict):
             return {k: cls.resolve_env_variables(v) for k, v in config.items()}

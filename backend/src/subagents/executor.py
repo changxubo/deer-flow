@@ -1,5 +1,6 @@
 """Subagent execution engine."""
 
+import asyncio
 import logging
 import threading
 import uuid
@@ -204,8 +205,8 @@ class SubagentExecutor:
 
         return state
 
-    def execute(self, task: str, result_holder: SubagentResult | None = None) -> SubagentResult:
-        """Execute a task synchronously.
+    async def _aexecute(self, task: str, result_holder: SubagentResult | None = None) -> SubagentResult:
+        """Execute a task asynchronously.
 
         Args:
             task: The task description for the subagent.
@@ -240,12 +241,12 @@ class SubagentExecutor:
                 run_config["configurable"] = {"thread_id": self.thread_id}
                 context["thread_id"] = self.thread_id
 
-            logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} starting execution with max_turns={self.config.max_turns}")
+            logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} starting async execution with max_turns={self.config.max_turns}")
 
             # Use stream instead of invoke to get real-time updates
             # This allows us to collect AI messages as they are generated
             final_state = None
-            for chunk in agent.stream(state, config=run_config, context=context, stream_mode="values"):  # type: ignore[arg-type]
+            async for chunk in agent.astream(state, config=run_config, context=context, stream_mode="values"):  # type: ignore[arg-type]
                 final_state = chunk
 
                 # Extract AI messages from the current state
@@ -269,7 +270,7 @@ class SubagentExecutor:
                             result.ai_messages.append(message_dict)
                             logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} captured AI message #{len(result.ai_messages)}")
 
-            logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} completed execution")
+            logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} completed async execution")
 
             if final_state is None:
                 logger.warning(f"[trace={self.trace_id}] Subagent {self.config.name} no final state")
@@ -315,12 +316,52 @@ class SubagentExecutor:
             result.completed_at = datetime.now()
 
         except Exception as e:
-            logger.exception(f"[trace={self.trace_id}] Subagent {self.config.name} execution failed")
+            logger.exception(f"[trace={self.trace_id}] Subagent {self.config.name} async execution failed")
             result.status = SubagentStatus.FAILED
             result.error = str(e)
             result.completed_at = datetime.now()
 
         return result
+
+    def execute(self, task: str, result_holder: SubagentResult | None = None) -> SubagentResult:
+        """Execute a task synchronously (wrapper around async execution).
+
+        This method runs the async execution in a new event loop, allowing
+        asynchronous tools (like MCP tools) to be used within the thread pool.
+
+        Args:
+            task: The task description for the subagent.
+            result_holder: Optional pre-created result object to update during execution.
+
+        Returns:
+            SubagentResult with the execution result.
+        """
+        # Run the async execution in a new event loop
+        # This is necessary because:
+        # 1. We may have async-only tools (like MCP tools)
+        # 2. We're running inside a ThreadPoolExecutor which doesn't have an event loop
+        #
+        # Note: _aexecute() catches all exceptions internally, so this outer
+        # try-except only handles asyncio.run() failures (e.g., if called from
+        # an async context where an event loop already exists). Subagent execution
+        # errors are handled within _aexecute() and returned as FAILED status.
+        try:
+            return asyncio.run(self._aexecute(task, result_holder))
+        except Exception as e:
+            logger.exception(f"[trace={self.trace_id}] Subagent {self.config.name} execution failed")
+            # Create a result with error if we don't have one
+            if result_holder is not None:
+                result = result_holder
+            else:
+                result = SubagentResult(
+                    task_id=str(uuid.uuid4())[:8],
+                    trace_id=self.trace_id,
+                    status=SubagentStatus.FAILED,
+                )
+            result.status = SubagentStatus.FAILED
+            result.error = str(e)
+            result.completed_at = datetime.now()
+            return result
 
     def execute_async(self, task: str, task_id: str | None = None) -> str:
         """Start a task execution in the background.
@@ -343,7 +384,7 @@ class SubagentExecutor:
             status=SubagentStatus.PENDING,
         )
 
-        logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} starting async execution, task_id={task_id}")
+        logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} starting async execution, task_id={task_id}, timeout={self.config.timeout_seconds}s")
 
         with _background_tasks_lock:
             _background_tasks[task_id] = result
@@ -411,3 +452,40 @@ def list_background_tasks() -> list[SubagentResult]:
     """
     with _background_tasks_lock:
         return list(_background_tasks.values())
+
+
+def cleanup_background_task(task_id: str) -> None:
+    """Remove a completed task from background tasks.
+
+    Should be called by task_tool after it finishes polling and returns the result.
+    This prevents memory leaks from accumulated completed tasks.
+
+    Only removes tasks that are in a terminal state (COMPLETED/FAILED/TIMED_OUT)
+    to avoid race conditions with the background executor still updating the task entry.
+
+    Args:
+        task_id: The task ID to remove.
+    """
+    with _background_tasks_lock:
+        result = _background_tasks.get(task_id)
+        if result is None:
+            # Nothing to clean up; may have been removed already.
+            logger.debug("Requested cleanup for unknown background task %s", task_id)
+            return
+
+        # Only clean up tasks that are in a terminal state to avoid races with
+        # the background executor still updating the task entry.
+        is_terminal_status = result.status in {
+            SubagentStatus.COMPLETED,
+            SubagentStatus.FAILED,
+            SubagentStatus.TIMED_OUT,
+        }
+        if is_terminal_status or result.completed_at is not None:
+            del _background_tasks[task_id]
+            logger.debug("Cleaned up background task: %s", task_id)
+        else:
+            logger.debug(
+                "Skipping cleanup for non-terminal background task %s (status=%s)",
+                task_id,
+                result.status.value if hasattr(result.status, "value") else result.status,
+            )
