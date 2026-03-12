@@ -316,7 +316,7 @@ export const zhCN: Translations = {
     memory: {
       title: "记忆",
       description:
-        "Wukong 会在后台不断从你的对话中自动学习。这些记忆能帮助 Wukong 更好地理解你，并提供更个性化的体验。",
+        "Wukong Agent会在后台不断从你的对话中自动学习。这些记忆能帮助 Wukong Agent 更好地理解你，并提供更个性化的体验。",
       empty: "暂无可展示的记忆数据。",
       rawJson: "原始 JSON",
       markdown: {
@@ -376,12 +376,12 @@ export const zhCN: Translations = {
     notification: {
       title: "通知",
       description:
-        "Wukong 只会在窗口不活跃时发送完成通知，特别适合长时间任务：你可以先去做别的事，完成后会收到提醒。",
+        "Wukong Agent只会在窗口不活跃时发送完成通知，特别适合长时间任务：你可以先去做别的事，完成后会收到提醒。",
       requestPermission: "请求通知权限",
       deniedHint:
         "通知权限已被拒绝。可在浏览器的网站设置中重新开启，以接收完成提醒。",
       testButton: "发送测试通知",
-      testTitle: "Wukong",
+      testTitle: "Wukong Agent",
       testBody: "这是一条测试通知。",
       notSupported: "当前浏览器不支持通知功能。",
       disableNotification: "关闭通知",

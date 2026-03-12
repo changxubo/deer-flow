@@ -10,7 +10,6 @@ import {
   PlusIcon,
   RocketIcon,
   SparklesIcon,
-  RocketIcon,
   XIcon,
   ZapIcon,
 } from "lucide-react";
@@ -729,37 +728,7 @@ export function InputBox({
           )}
         </PromptInputTools>
         <PromptInputTools>
-          <ModelSelector
-            open={modelDialogOpen}
-            onOpenChange={setModelDialogOpen}
-          >
-            <ModelSelectorTrigger asChild>
-              <PromptInputButton>
-                <ModelSelectorName className="text-xs font-normal">
-                  {selectedModel?.display_name}
-                </ModelSelectorName>
-              </PromptInputButton>
-            </ModelSelectorTrigger>
-            <ModelSelectorContent>
-              <ModelSelectorInput placeholder={t.inputBox.searchModels} />
-              <ModelSelectorList>
-                {models.map((m) => (
-                  <ModelSelectorItem
-                    key={m.name}
-                    value={m.name}
-                    onSelect={() => handleModelSelect(m.name)}
-                  >
-                    <ModelSelectorName>{m.display_name}</ModelSelectorName>
-                    {m.name === context.model_name ? (
-                      <CheckIcon className="ml-auto size-4" />
-                    ) : (
-                      <div className="ml-auto size-4" />
-                    )}
-                  </ModelSelectorItem>
-                ))}
-              </ModelSelectorList>
-            </ModelSelectorContent>
-          </ModelSelector>
+         
           <PromptInputSubmit
             className="rounded-full"
             disabled={disabled}

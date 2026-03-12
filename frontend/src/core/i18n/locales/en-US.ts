@@ -328,7 +328,7 @@ export const enUS: Translations = {
     memory: {
       title: "Memory",
       description:
-        "Wukong automatically learns from your conversations in the background. These memories help Wukong understand you better and deliver a more personalized experience.",
+        "Wukong Agent automatically learns from your conversations in the background. These memories help Wukong understand you better and deliver a more personalized experience.",
       empty: "No memory data to display.",
       rawJson: "Raw JSON",
       markdown: {
@@ -390,12 +390,12 @@ export const enUS: Translations = {
     notification: {
       title: "Notification",
       description:
-        "Wukong only sends a completion notification when the window is not active. This is especially useful for long-running tasks so you can switch to other work and get notified when done.",
+        "Wukong Agent only sends a completion notification when the window is not active. This is especially useful for long-running tasks so you can switch to other work and get notified when done.",
       requestPermission: "Request notification permission",
       deniedHint:
         "Notification permission was denied. You can enable it in your browser's site settings to receive completion alerts.",
       testButton: "Send test notification",
-      testTitle: "Wukong",
+      testTitle: "Wukong Agent",
       testBody: "This is a test notification.",
       notSupported: "Your browser does not support notifications.",
       disableNotification: "Disable notification",

@@ -149,7 +149,7 @@ bash("npm test")  # Direct execution, not task()
 
 SYSTEM_PROMPT_TEMPLATE = """
 <role>
-You are wukong, an open-source super agent.
+You are Wukong agent, a personal super AI assistant.
 </role>
 
 {soul}
