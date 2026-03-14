@@ -84,6 +84,8 @@ services:
         PNPM_STORE_PATH: ${PNPM_STORE_PATH:-/root/.local/share/pnpm/store}
     container_name: deer-flow-frontend
     command: sh -c "cd frontend && pnpm run dev > /app/logs/frontend.log 2>&1"
+    ports:
+      - "3000:3000"
     volumes:
       - ../frontend/src:/app/frontend/src
       - ../frontend/public:/app/frontend/public
@@ -110,6 +112,8 @@ services:
       # cache_from disabled - requires manual setup: mkdir -p /tmp/docker-cache-gateway
     container_name: deer-flow-gateway
     command: sh -c "cd backend && uv run uvicorn src.gateway.app:app --host 0.0.0.0 --port 8001 --reload --reload-include='*.yaml .env' > /app/logs/gateway.log 2>&1"
+    ports:
+      - "8001:8001"
     volumes:
       - ../backend/:/app/backend/
       # Preserve the .venv built during Docker image build — mounting the full backend/
@@ -137,15 +141,62 @@ services:
     networks:
       - deer-flow-dev
     restart: unless-stopped
-
+  postgres:
+    container_name: deer-flow-postgres
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U postgres
+      timeout: 1s
+      interval: 5s
+      retries: 5
+      start_period: 10s
+    image: pgvector/pgvector:pg16
+    networks:
+      - deer-flow-dev
+    ports:
+      - mode: ingress
+        target: 5432
+        published: "5432"
+        protocol: tcp
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+  redis:
+    container_name: deer-flow-redis
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - redis-cli ping
+      timeout: 1s
+      interval: 5s
+      retries: 5
+    image: redis:6
+    networks:
+      - deer-flow-dev
+    ports:
+      - mode: ingress
+        target: 6379
+        published: "6379"
+        protocol: tcp
+    volumes:
+      - ./redis_data:/data
+    restart: unless-stopped
   # Backend - LangGraph Server
   langgraph:
-    build:
-      context: ../
-      dockerfile: backend/Dockerfile
+    image: backend_langgraph-api:latest
+    ports:
+        - "8000:8000"
+    #build:
+    #  context: ../
+    #  dockerfile: backend/Dockerfile
       # cache_from disabled - requires manual setup: mkdir -p /tmp/docker-cache-langgraph
     container_name: deer-flow-langgraph
-    command: sh -c "cd backend && uv run langgraph dev --no-browser --allow-blocking --host 0.0.0.0 --port 2024 > /app/logs/langgraph.log 2>&1"
+    #command: sh -c "cd backend && uv run langgraph dev --no-browser --allow-blocking --host 0.0.0.0 --port 2024 > /app/logs/langgraph.log 2>&1"
     volumes:
       - ../backend/:/app/backend/
       # Preserve the .venv built during Docker image build — mounting the full backend/
@@ -159,17 +210,40 @@ services:
       - ~/.cache/uv:/root/.cache/uv
       # DooD: same as gateway — AioSandboxProvider runs inside LangGraph process.
       - /var/run/docker.sock:/var/run/docker.sock
-    working_dir: /app
+    working_dir: /deps/backend
+    entrypoint: /storage/entrypoint.sh
     environment:
       - CI=true
       - DEER_FLOW_HOST_BASE_DIR=${DEER_FLOW_ROOT}/backend/.deer-flow
       - DEER_FLOW_HOST_SKILLS_PATH=${DEER_FLOW_ROOT}/skills
       - DEER_FLOW_SANDBOX_HOST=host.docker.internal
+      - POSTGRES_URI=postgres://postgres:postgres@postgres:5432/postgres?sslmode=disable
+      - REDIS_URI=redis://redis:6379
+      - PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      - LANG=C.UTF-8
+      - GPG_KEY=7169605F62C751356D054A26A821E680E5FA6305
+      - PYTHON_VERSION=3.12.13
+      - PYTHON_SHA256=c08bc65a81971c1dd5783182826503369466c7e67374d1646519adf05207b684
+      - PYTHONFAULTHANDLER=1
+      - PYTHONUNBUFFERED=True
+      - PORT=8000
+      - PIP_ROOT_USER_ACTION=ignore
+      - N_WORKERS=1
+      - N_JOBS_PER_WORKER=10
+      - LANGGRAPH_RUNTIME_EDITION=postgres
+      - LANGGRAPH_SERVER_HOST=0.0.0.0
+      - LANGSMITH_LANGGRAPH_API_REVISION=9d8f952
+      - LANGSMITH_LANGGRAPH_API_VARIANT=licensed  
     env_file:
       - ../.env
     extra_hosts:
       # For Linux: map host.docker.internal to host gateway
       - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - deer-flow-dev
     restart: unless-stopped
@@ -185,4 +259,4 @@ networks:
     driver: bridge
     ipam:
       config:
-        - subnet: 192.168.200.0/24
+        - subnet: 192.168.205.0/24

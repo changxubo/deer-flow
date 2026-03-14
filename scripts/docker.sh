@@ -11,6 +11,10 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 DOCKER_DIR="$PROJECT_ROOT/docker"
+BACKEND_DIR="$PROJECT_ROOT/backend"
+
+# LangGraph Build command
+LANGGRAPH_CMD="uv run langgraph build --tag backend_langgraph-api"
 
 # Docker Compose command with project name
 COMPOSE_CMD="docker compose -p deer-flow-dev -f docker-compose-dev.yaml"
@@ -157,6 +161,12 @@ start() {
             echo -e "${BLUE}Created empty extensions_config.json${NC}"
         fi
     fi
+
+    
+    echo "Building backend_langgraph-api docker image..."
+    cd "$BACKEND_DIR" && $LANGGRAPH_CMD 
+    echo "✓ Docker image backend_langgraph-api built successfully"
+
 
     echo "Building and starting containers..."
     cd "$DOCKER_DIR" && $COMPOSE_CMD up --build -d --remove-orphans $services

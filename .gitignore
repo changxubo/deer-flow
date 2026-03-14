@@ -52,3 +52,5 @@ backend/docker-run.sh
 backend/docker-compose.yaml
 backend/cofig.yaml
 backend/resolved_compose.yaml
+docker/redis_data
+docker/postgres_data
