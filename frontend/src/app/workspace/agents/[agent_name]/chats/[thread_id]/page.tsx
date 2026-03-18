@@ -9,13 +9,11 @@ import { Button } from "@/components/ui/button";
 import { AgentWelcome } from "@/components/workspace/agent-welcome";
 import { ArtifactTrigger } from "@/components/workspace/artifacts";
 import { ChatBox, useThreadChat } from "@/components/workspace/chats";
-import { ExportTrigger } from "@/components/workspace/export-trigger";
 import { InputBox } from "@/components/workspace/input-box";
 import { MessageList } from "@/components/workspace/messages";
 import { ThreadContext } from "@/components/workspace/messages/context";
 import { ThreadTitle } from "@/components/workspace/thread-title";
 import { TodoList } from "@/components/workspace/todo-list";
-import { TokenUsageIndicator } from "@/components/workspace/token-usage-indicator";
 import { Tooltip } from "@/components/workspace/tooltip";
 import { useAgent } from "@/core/agents";
 import { useI18n } from "@/core/i18n/hooks";
@@ -116,8 +114,6 @@ export default function AgentChatPage() {
                   <PlusSquare /> {t.agents.newChat}
                 </Button>
               </Tooltip>
-              <TokenUsageIndicator messages={thread.messages} />
-              <ExportTrigger threadId={threadId} />
               <ArtifactTrigger />
             </div>
           </header>
@@ -158,13 +154,7 @@ export default function AgentChatPage() {
                   isNewThread={isNewThread}
                   threadId={threadId}
                   autoFocus={isNewThread}
-                  status={
-                    thread.error
-                      ? "error"
-                      : thread.isLoading
-                        ? "streaming"
-                        : "ready"
-                  }
+                  status={thread.isLoading ? "streaming" : "ready"}
                   context={settings.context}
                   extraHeader={
                     isNewThread && (

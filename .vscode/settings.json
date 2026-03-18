@@ -1,0 +1,12 @@
+{
+  "editor.renderControlCharacters": false,
+  "editor.unicodeHighlight.invisibleCharacters": false,
+  "python-envs.pythonProjects": [
+    {
+      "path": "backend",
+      "envManager": "ms-python.python:venv",
+      "packageManager": "ms-python.python:pip",
+      "workspace": "deer-flow"
+    }
+  ]
+}

@@ -29,10 +29,7 @@ function getModeDescriptionKey(
   mode: AgentMode,
 ): keyof Pick<
   Translations["inputBox"],
-  | "flashModeDescription"
-  | "reasoningModeDescription"
-  | "proModeDescription"
-  | "ultraModeDescription"
+  "flashModeDescription" | "reasoningModeDescription" | "proModeDescription" | "ultraModeDescription"
 > {
   switch (mode) {
     case "flash":

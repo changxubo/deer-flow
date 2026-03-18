@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import {
-  SidebarGroup,
+
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -16,7 +16,7 @@ export function WorkspaceNavChatList() {
   const { t } = useI18n();
   const pathname = usePathname();
   return (
-    <SidebarGroup className="pt-1">
+   
       <SidebarMenu>
         <SidebarMenuItem>
           <SidebarMenuButton isActive={pathname === "/workspace/chats"} asChild>
@@ -38,6 +38,6 @@ export function WorkspaceNavChatList() {
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>
-    </SidebarGroup>
+   
   );
 }
