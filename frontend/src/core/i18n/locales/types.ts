@@ -8,6 +8,7 @@ export interface Translations {
 
   // Common
   common: {
+    site: string;
     home: string;
     settings: string;
     delete: string;

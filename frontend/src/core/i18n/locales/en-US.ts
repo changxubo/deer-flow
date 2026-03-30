@@ -19,6 +19,7 @@ export const enUS: Translations = {
 
   // Common
   common: {
+    site: "Wukong Agent",
     home: "Home",
     settings: "Settings",
     delete: "Delete",

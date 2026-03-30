@@ -2,7 +2,7 @@ install:
 	uv sync
 
 dev:
-	uv run langgraph dev --no-browser --allow-blocking --no-reload
+	uv run uvicorn src.app:app --host 0.0.0.0 --port 2024 --reload
 
 gateway:
 	PYTHONPATH=. uv run uvicorn app.gateway.app:app --host 0.0.0.0 --port 8001
