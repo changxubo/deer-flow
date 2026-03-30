@@ -54,3 +54,5 @@ web/
 # Deployment artifacts
 backend/Dockerfile.langgraph
 config.yaml.bak
+docker/postgres_data/
+docker/redis_data/
