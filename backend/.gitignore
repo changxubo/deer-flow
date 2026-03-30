@@ -29,3 +29,4 @@ config.yaml
 skills/
 skills-lock.json
 docker-run.sh
+src-archive/*
