@@ -19,7 +19,7 @@ export const zhCN: Translations = {
 
   // Common
   common: {
-    site: "DeepAgents",
+    site: "Deep Agent",
     home: "首页",
     settings: "设置",
     delete: "删除",

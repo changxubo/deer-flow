@@ -42,12 +42,20 @@ export function WorkspaceHeader({ className }: { className?: string }) {
                 className="text-primary ml-2 flex items-center gap-2 "
               >
                 <BotMessageSquare  size={20} className="hidden"/>
-                <span className="text-lg font-normal">{t.common.site}</span>
+                <img src="/deep-agent.png" alt="Logo" className="h-12 w-auto rotate-45 hidden sm:block" />
+                <span className="text-md font-normal uppercase">{t.common.site}</span>
+                <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                  V2.0
+                </span>
               </Link>
             ) : (
               <div className="text-primary ml-2 flex cursor-default items-center gap-2 ">
                 <BotMessageSquare  size={20} className="hidden"/>
-                <span className="text-lg font-normal">{t.common.site}</span>
+                <img src="/deep-agent.png" alt="Logo" className="h-12 w-auto rotate-45 hidden sm:block" />
+                <span className="text-md font-normal uppercase">{t.common.site}</span>
+                <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                  V2.0
+                  </span>
               </div>
             )}
             <SidebarTrigger />
