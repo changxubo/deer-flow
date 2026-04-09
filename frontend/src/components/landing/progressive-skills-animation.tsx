@@ -367,7 +367,7 @@ export default function ProgressiveSkillsAnimation() {
 
       {/* Bottom Left Play/Pause Button */}
       <Tooltip content="Play / Pause">
-        <div className="absolute bottom-12 left-12 z-40 flex items-center gap-2">
+        <div className="absolute right-12 z-40 flex items-center gap-2">
           <motion.button
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -386,82 +386,14 @@ export default function ProgressiveSkillsAnimation() {
         </div>
       </Tooltip>
 
-      <div className="flex h-full max-h-[700px] w-full max-w-6xl gap-8">
-        {/* Left: File Tree */}
-        <div className="flex flex-1 flex-col">
-          <motion.div
-            className="mb-4 font-mono text-sm text-zinc-500"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            /mnt/skills/
-          </motion.div>
-
-          <div className="space-y-2">
-            {getFileTree().map((item, index) => (
-              <motion.div
-                key={`${item.name}-${index}`}
-                className={`flex items-center gap-3 text-lg font-medium transition-all duration-300 ${
-                  item.done
-                    ? "text-green-500"
-                    : item.dragging
-                      ? "translate-x-8 scale-105 text-blue-400"
-                      : item.active
-                        ? "text-white"
-                        : item.highlight
-                          ? "text-purple-400"
-                          : "text-zinc-600"
-                }`}
-                style={{ paddingLeft: `${item.indent * 24}px` }}
-                animate={
-                  item.done
-                    ? {
-                        scale: 1,
-                        opacity: 1,
-                      }
-                    : {}
-                }
-              >
-                {item.type === "folder" ? (
-                  <Folder
-                    size={20}
-                    className={
-                      item.done
-                        ? "text-green-500"
-                        : item.highlight
-                          ? "text-purple-400"
-                          : ""
-                    }
-                  />
-                ) : (
-                  <FileText
-                    size={20}
-                    className={
-                      item.done
-                        ? "text-green-500"
-                        : item.highlight
-                          ? "text-purple-400"
-                          : ""
-                    }
-                  />
-                )}
-                <span>{item.name}</span>
-                {item.done && <Check size={16} className="text-green-500" />}
-                {item.highlight && !item.done && (
-                  <Sparkles size={16} className="text-purple-400" />
-                )}
-              </motion.div>
-            ))}
-          </div>
-        </div>
-
+      <div className="flex h-full max-h-[700px] w-full max-w-6xl gap-16">
         {/* Right: Chat Interface */}
         <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/50">
           {/* Chat Header */}
           <div className="border-b border-zinc-800 p-4">
             <div className="flex items-center gap-2">
               <div className="h-3 w-3 rounded-full bg-green-500" />
-              <span className="text-sm text-zinc-400">DeerFlow Agent</span>
+              <span className="text-sm text-zinc-400">Lead Agent</span>
             </div>
           </div>
 
@@ -508,10 +440,10 @@ export default function ProgressiveSkillsAnimation() {
                     "deploying",
                     "done",
                   ].includes(phase) && (
-                    <div className="text-base text-zinc-300">
-                      <span className="text-purple-400">✨</span> Found 3 skills
-                    </div>
-                  )}
+                      <div className="text-base text-zinc-300">
+                        <span className="text-purple-400">✨</span> Found 3 skills
+                      </div>
+                    )}
 
                   {/* Researching Section */}
                   {[
@@ -524,126 +456,126 @@ export default function ProgressiveSkillsAnimation() {
                     "deploying",
                     "done",
                   ].includes(phase) && (
-                    <div className="mt-4">
-                      <hr className="mb-3 border-zinc-700" />
-                      <div className="mb-3 text-zinc-300">
-                        🔬 Researching...
-                      </div>
-                      <div className="mb-3 space-y-2">
-                        {/* Loading SKILL.md */}
+                      <div className="mt-4">
+                        <hr className="mb-3 border-zinc-700" />
+                        <div className="mb-3 text-zinc-300">
+                          🔬 Researching...
+                        </div>
+                        <div className="mb-3 space-y-2">
+                          {/* Loading SKILL.md */}
+                          {[
+                            "load-skill",
+                            "load-template",
+                            "researching",
+                            "load-frontend",
+                            "building",
+                            "load-deploy",
+                            "deploying",
+                            "done",
+                          ].includes(phase) && (
+                              <div className="flex items-center gap-2 pl-4 text-zinc-400">
+                                <FileText size={16} />
+                                <span>Loading deep-search/SKILL.md...</span>
+                              </div>
+                            )}
+                          {/* Loading biotech.md */}
+                          {[
+                            "load-template",
+                            "researching",
+                            "load-frontend",
+                            "building",
+                            "load-deploy",
+                            "deploying",
+                            "done",
+                          ].includes(phase) && (
+                              <div className="flex items-center gap-2 pl-4 text-zinc-400">
+                                <FileText size={16} />
+                                <span>
+                                  Found biotech related topic, loading
+                                  deep-search/biotech.md...
+                                </span>
+                              </div>
+                            )}
+                        </div>
+                        {/* Search steps */}
+                        {phase === "researching" && (
+                          <div className="max-h-[180px] space-y-2 overflow-hidden pl-4">
+                            {searchSteps.slice(0, searchIndex).map((step, i) => (
+                              <motion.div
+                                key={i}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="flex items-center gap-2 text-sm text-zinc-500"
+                              >
+                                {step.type === "search" ? (
+                                  <Search size={14} className="text-blue-400" />
+                                ) : (
+                                  <Globe size={14} className="text-green-400" />
+                                )}
+                                <span className="truncate">{step.text}</span>
+                              </motion.div>
+                            ))}
+                          </div>
+                        )}
                         {[
-                          "load-skill",
-                          "load-template",
-                          "researching",
                           "load-frontend",
                           "building",
                           "load-deploy",
                           "deploying",
                           "done",
                         ].includes(phase) && (
-                          <div className="flex items-center gap-2 pl-4 text-zinc-400">
-                            <FileText size={16} />
-                            <span>Loading deep-search/SKILL.md...</span>
-                          </div>
-                        )}
-                        {/* Loading biotech.md */}
-                        {[
-                          "load-template",
-                          "researching",
-                          "load-frontend",
-                          "building",
-                          "load-deploy",
-                          "deploying",
-                          "done",
-                        ].includes(phase) && (
-                          <div className="flex items-center gap-2 pl-4 text-zinc-400">
-                            <FileText size={16} />
-                            <span>
-                              Found biotech related topic, loading
-                              deep-search/biotech.md...
-                            </span>
-                          </div>
-                        )}
+                            <div className="max-h-[180px] space-y-2 overflow-hidden pl-4">
+                              {searchSteps.map((step, i) => (
+                                <motion.div
+                                  key={i}
+                                  initial={{ opacity: 0, y: 10 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  className="flex items-center gap-2 text-sm text-zinc-500"
+                                >
+                                  {step.type === "search" ? (
+                                    <Search size={14} className="text-blue-400" />
+                                  ) : (
+                                    <Globe size={14} className="text-green-400" />
+                                  )}
+                                  <span className="truncate">{step.text}</span>
+                                </motion.div>
+                              ))}
+                            </div>
+                          )}
                       </div>
-                      {/* Search steps */}
-                      {phase === "researching" && (
-                        <div className="max-h-[180px] space-y-2 overflow-hidden pl-4">
-                          {searchSteps.slice(0, searchIndex).map((step, i) => (
-                            <motion.div
-                              key={i}
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="flex items-center gap-2 text-sm text-zinc-500"
-                            >
-                              {step.type === "search" ? (
-                                <Search size={14} className="text-blue-400" />
-                              ) : (
-                                <Globe size={14} className="text-green-400" />
-                              )}
-                              <span className="truncate">{step.text}</span>
-                            </motion.div>
-                          ))}
-                        </div>
-                      )}
-                      {[
-                        "load-frontend",
-                        "building",
-                        "load-deploy",
-                        "deploying",
-                        "done",
-                      ].includes(phase) && (
-                        <div className="max-h-[180px] space-y-2 overflow-hidden pl-4">
-                          {searchSteps.map((step, i) => (
-                            <motion.div
-                              key={i}
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="flex items-center gap-2 text-sm text-zinc-500"
-                            >
-                              {step.type === "search" ? (
-                                <Search size={14} className="text-blue-400" />
-                              ) : (
-                                <Globe size={14} className="text-green-400" />
-                              )}
-                              <span className="truncate">{step.text}</span>
-                            </motion.div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                    )}
 
                   {/* Building */}
                   {["building", "load-deploy", "deploying", "done"].includes(
                     phase,
                   ) && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="mt-4"
-                    >
-                      <hr className="mb-3 border-zinc-700" />
-                      <div className="mb-3 text-zinc-300">🔨 Building...</div>
-                      <div className="mb-3 flex items-center gap-2 pl-4 text-zinc-400">
-                        <FileText size={16} />
-                        <span>Loading frontend-design/SKILL.md...</span>
-                      </div>
-                      <div className="space-y-2 pl-4">
-                        {workspaceFiles.slice(0, buildIndex).map((file) => (
-                          <motion.div
-                            key={file}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            className="flex items-center gap-2 text-sm text-green-500"
-                          >
-                            <FileText size={14} />
-                            <span>Generating {file}...</span>
-                            <Check size={14} />
-                          </motion.div>
-                        ))}
-                      </div>
-                    </motion.div>
-                  )}
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="mt-4"
+                      >
+                        <hr className="mb-3 border-zinc-700" />
+                        <div className="mb-3 text-zinc-300">🔨 Building...</div>
+                        <div className="mb-3 flex items-center gap-2 pl-4 text-zinc-400">
+                          <FileText size={16} />
+                          <span>Loading frontend-design/SKILL.md...</span>
+                        </div>
+                        <div className="space-y-2 pl-4">
+                          {workspaceFiles.slice(0, buildIndex).map((file) => (
+                            <motion.div
+                              key={file}
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              className="flex items-center gap-2 text-sm text-green-500"
+                            >
+                              <FileText size={14} />
+                              <span>Generating {file}...</span>
+                              <Check size={14} />
+                            </motion.div>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
 
                   {/* Deploying */}
                   {["load-deploy", "deploying", "done"].includes(phase) && (
@@ -691,8 +623,74 @@ export default function ProgressiveSkillsAnimation() {
           {/* Chat Input (decorative) */}
           <div className="border-t border-zinc-800 p-4">
             <div className="rounded-xl bg-zinc-800 px-4 py-3 text-sm text-zinc-500">
-              Ask DeerFlow anything...
+              Ask anything...
             </div>
+          </div>
+        </div>
+        {/* Left: File Tree */}
+        <div className="flex flex-1 flex-col">
+          <motion.div
+            className="mb-4 font-mono text-sm text-zinc-500"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            /mnt/skills/
+          </motion.div>
+
+          <div className="space-y-2">
+            {getFileTree().map((item, index) => (
+              <motion.div
+                key={`${item.name}-${index}`}
+                className={`flex items-center gap-3 text-lg font-medium transition-all duration-300 ${item.done
+                    ? "text-green-500"
+                    : item.dragging
+                      ? "translate-x-8 scale-105 text-blue-400"
+                      : item.active
+                        ? "text-white"
+                        : item.highlight
+                          ? "text-purple-400"
+                          : "text-zinc-600"
+                  }`}
+                style={{ paddingLeft: `${item.indent * 24}px` }}
+                animate={
+                  item.done
+                    ? {
+                      scale: 1,
+                      opacity: 1,
+                    }
+                    : {}
+                }
+              >
+                {item.type === "folder" ? (
+                  <Folder
+                    size={20}
+                    className={
+                      item.done
+                        ? "text-green-500"
+                        : item.highlight
+                          ? "text-purple-400"
+                          : ""
+                    }
+                  />
+                ) : (
+                  <FileText
+                    size={20}
+                    className={
+                      item.done
+                        ? "text-green-500"
+                        : item.highlight
+                          ? "text-purple-400"
+                          : ""
+                    }
+                  />
+                )}
+                <span>{item.name}</span>
+                {item.done && <Check size={16} className="text-green-500" />}
+                {item.highlight && !item.done && (
+                  <Sparkles size={16} className="text-purple-400" />
+                )}
+              </motion.div>
+            ))}
           </div>
         </div>
       </div>

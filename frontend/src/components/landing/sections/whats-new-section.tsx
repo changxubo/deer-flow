@@ -1,5 +1,8 @@
 "use client";
+import { ChevronRightIcon } from "lucide-react";
+import Link from "next/link";
 
+import { Button } from "@/components/ui/button";
 import MagicBento, { type BentoCardProps } from "@/components/ui/magic-bento";
 import { cn } from "@/lib/utils";
 
@@ -42,9 +45,9 @@ const features: BentoCardProps[] = [
   },
   {
     color: COLOR,
-    label: "Free",
-    title: "Open Source",
-    description: "MIT License, self-hosted, full control",
+    label: "Enterprise",
+    title: "Production-Ready",
+    description: "Enterprise, self-hosted, full control",
   },
 ];
 
@@ -52,8 +55,17 @@ export function WhatsNewSection({ className }: { className?: string }) {
   return (
     <Section
       className={cn("", className)}
-      title="Whats New in DeerFlow 2.0"
-      subtitle="DeerFlow is now evolving from a Deep Research agent into a full-stack Super Agent"
+      title="Whats New in Agent 2.0"
+      subtitle={
+        <div>
+          <Link href="/workspace">
+            <Button className="size-lg mt-8 scale-108" size="lg">
+              <span className="text-md">Demo Project</span>
+              <ChevronRightIcon className="size-4" />
+            </Button>
+          </Link>
+        </div>
+      }
     >
       <div className="flex w-full items-center justify-center">
         <MagicBento data={features} />

@@ -26,3 +26,7 @@ config.yaml
 
 # Claude Code settings
 .claude/settings.local.json
+skills/
+skills-lock.json
+docker-run.sh
+src-archive/*

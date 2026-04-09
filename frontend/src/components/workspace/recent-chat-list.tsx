@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  Download,
-  FileJson,
-  FileText,
-  MoreHorizontal,
-  Pencil,
-  Share2,
-  Trash2,
-} from "lucide-react";
+import { MoreHorizontal, Pencil, Share2, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
@@ -27,9 +19,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -42,21 +31,14 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { getAPIClient } from "@/core/api";
 import { useI18n } from "@/core/i18n/hooks";
-import {
-  exportThreadAsJSON,
-  exportThreadAsMarkdown,
-} from "@/core/threads/export";
 import {
   useDeleteThread,
   useRenameThread,
   useThreads,
 } from "@/core/threads/hooks";
-import type { AgentThread, AgentThreadState } from "@/core/threads/types";
 import { pathOfThread, titleOfThread } from "@/core/threads/utils";
 import { env } from "@/env";
-import { isIMEComposing } from "@/lib/ime";
 
 export function RecentChatList() {
   const { t } = useI18n();
@@ -128,32 +110,6 @@ export function RecentChatList() {
     },
     [t],
   );
-
-  const handleExport = useCallback(
-    async (thread: AgentThread, format: "markdown" | "json") => {
-      try {
-        const apiClient = getAPIClient();
-        const state = await apiClient.threads.getState<AgentThreadState>(
-          thread.thread_id,
-        );
-        const messages = state.values?.messages ?? [];
-        if (messages.length === 0) {
-          toast.error(t.conversation.noMessages);
-          return;
-        }
-        if (format === "markdown") {
-          exportThreadAsMarkdown(thread, messages);
-        } else {
-          exportThreadAsJSON(thread, messages);
-        }
-        toast.success(t.common.exportSuccess);
-      } catch {
-        toast.error("Failed to export conversation");
-      }
-    },
-    [t],
-  );
-
   if (threads.length === 0) {
     return null;
   }
@@ -216,30 +172,6 @@ export function RecentChatList() {
                                 <Share2 className="text-muted-foreground" />
                                 <span>{t.common.share}</span>
                               </DropdownMenuItem>
-                              <DropdownMenuSub>
-                                <DropdownMenuSubTrigger>
-                                  <Download className="text-muted-foreground" />
-                                  <span>{t.common.export}</span>
-                                </DropdownMenuSubTrigger>
-                                <DropdownMenuSubContent>
-                                  <DropdownMenuItem
-                                    onSelect={() =>
-                                      handleExport(thread, "markdown")
-                                    }
-                                  >
-                                    <FileText className="text-muted-foreground" />
-                                    <span>{t.common.exportAsMarkdown}</span>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onSelect={() =>
-                                      handleExport(thread, "json")
-                                    }
-                                  >
-                                    <FileJson className="text-muted-foreground" />
-                                    <span>{t.common.exportAsJSON}</span>
-                                  </DropdownMenuItem>
-                                </DropdownMenuSubContent>
-                              </DropdownMenuSub>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 onSelect={() => handleDelete(thread.thread_id)}
@@ -272,8 +204,7 @@ export function RecentChatList() {
               onChange={(e) => setRenameValue(e.target.value)}
               placeholder={t.common.rename}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !isIMEComposing(e)) {
-                  e.preventDefault();
+                if (e.key === "Enter") {
                   handleRenameSubmit();
                 }
               }}

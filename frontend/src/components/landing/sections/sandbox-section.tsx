@@ -1,5 +1,5 @@
 "use client";
-
+import { cn } from "@/lib/utils";
 import {
   AnimatedSpan,
   Terminal,
@@ -11,19 +11,20 @@ import { Section } from "../section";
 export function SandboxSection({ className }: { className?: string }) {
   return (
     <Section
-      className={className}
+      className={cn("w-full bg-white/2 ", className)}
       title="Agent Runtime Environment"
       subtitle={
-        <p>
-          We give DeerFlow a &quot;computer&quot;, which can execute commands,
-          manage files, and run long tasks — all in a secure Docker-based
-          sandbox
-        </p>
+        <div>
+          We give Agent a &quot;computer&quot;, which can execute commands,
+          manage files, and run long tasks 
+          <br /> 
+          - all in a secure Docker-based sandbox
+        </div>
       }
     >
-      <div className="mt-8 flex w-full max-w-6xl flex-col items-center gap-12 lg:flex-row lg:gap-16">
+      <div className="mt-8 flex w-full max-w-6xl flex-col items-center  gap-12 lg:flex-row lg:gap-16">
         {/* Left: Terminal */}
-        <div className="w-full flex-1">
+        <div className="w-full flex-1 ml-8">
           <Terminal className="h-[360px] w-full">
             {/* Scene 1: Build a Game */}
             <TypingAnimation>$ cat requirements.txt</TypingAnimation>

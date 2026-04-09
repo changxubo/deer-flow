@@ -2,6 +2,7 @@
 
 .PHONY: help config config-upgrade check install dev dev-pro dev-daemon dev-daemon-pro start start-pro start-daemon start-daemon-pro stop up up-pro down clean docker-init docker-start docker-start-pro docker-stop docker-logs docker-logs-frontend docker-logs-gateway
 
+PYTHON ?= python3
 BASH ?= bash
 
 # Detect OS for Windows compatibility

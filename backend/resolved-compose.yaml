@@ -1,0 +1,70 @@
+name: backend
+services:
+  langgraph-api:
+    depends_on:
+      langgraph-postgres:
+        condition: service_healthy
+        required: true
+      langgraph-redis:
+        condition: service_healthy
+        required: true
+    environment:
+      POSTGRES_URI: postgres://postgres:postgres@langgraph-postgres:5433/postgres?sslmode=disable
+      REDIS_URI: redis://langgraph-redis:6379
+    image: backend-langgraph-api:latest
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 8000
+        published: "8123"
+        protocol: tcp
+  langgraph-postgres:
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U postgres
+      timeout: 1s
+      interval: 5s
+      retries: 5
+      start_period: 10s
+    image: pgvector/pgvector:pg16
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 5432
+        published: "5433"
+        protocol: tcp
+    volumes:
+      - type: volume
+        source: langgraph-data
+        target: /var/lib/postgresql/data
+        volume: {}
+  langgraph-redis:
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - redis-cli ping
+      timeout: 1s
+      interval: 5s
+      retries: 5
+    image: redis:6
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 6379
+        published: "6379"
+        protocol: tcp
+networks:
+  default:
+    name: backend_default
+volumes:
+  langgraph-data:
+    name: backend_langgraph-data
+    driver: local

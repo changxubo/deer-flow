@@ -9,7 +9,6 @@ import {
   useSpecificChatMode,
   useThreadChat,
 } from "@/components/workspace/chats";
-import { ExportTrigger } from "@/components/workspace/export-trigger";
 import { InputBox } from "@/components/workspace/input-box";
 import {
   MessageList,
@@ -19,7 +18,6 @@ import {
 import { ThreadContext } from "@/components/workspace/messages/context";
 import { ThreadTitle } from "@/components/workspace/thread-title";
 import { TodoList } from "@/components/workspace/todo-list";
-import { TokenUsageIndicator } from "@/components/workspace/token-usage-indicator";
 import { Welcome } from "@/components/workspace/welcome";
 import { useI18n } from "@/core/i18n/hooks";
 import { useNotification } from "@/core/notification/hooks";
@@ -44,7 +42,7 @@ export default function ChatPage() {
 
   const { showNotification } = useNotification();
 
-  const [thread, sendMessage, isUploading] = useThreadStream({
+  const [thread, sendMessage] = useThreadStream({
     threadId: isNewThread ? undefined : threadId,
     context: settings.context,
     isMock,
@@ -102,9 +100,7 @@ export default function ChatPage() {
             <div className="flex w-full items-center text-sm font-medium">
               <ThreadTitle threadId={threadId} thread={thread} />
             </div>
-            <div className="flex items-center gap-2">
-              <TokenUsageIndicator messages={thread.messages} />
-              <ExportTrigger threadId={threadId} />
+            <div>
               <ArtifactTrigger />
             </div>
           </header>
@@ -138,42 +134,21 @@ export default function ChatPage() {
                     />
                   </div>
                 </div>
-                {mounted ? (
-                  <InputBox
-                    className={cn("bg-background/5 w-full -translate-y-4")}
-                    isNewThread={isNewThread}
-                    threadId={threadId}
-                    autoFocus={isNewThread}
-                    status={
-                      thread.error
-                        ? "error"
-                        : thread.isLoading
-                          ? "streaming"
-                          : "ready"
-                    }
-                    context={settings.context}
-                    extraHeader={
-                      isNewThread && <Welcome mode={settings.context.mode} />
-                    }
-                    disabled={
-                      env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true" ||
-                      isUploading
-                    }
-                    onContextChange={(context) =>
-                      setSettings("context", context)
-                    }
-                    onFollowupsVisibilityChange={setShowFollowups}
-                    onSubmit={handleSubmit}
-                    onStop={handleStop}
-                  />
-                ) : (
-                  <div
-                    aria-hidden="true"
-                    className={cn(
-                      "bg-background/5 h-32 w-full -translate-y-4 rounded-2xl border",
-                    )}
-                  />
-                )}
+                <InputBox
+                  className={cn("bg-background/5 w-full -translate-y-4")}
+                  isNewThread={isNewThread}
+                  threadId={threadId}
+                  autoFocus={isNewThread}
+                  status={thread.isLoading ? "streaming" : "ready"}
+                  context={settings.context}
+                  extraHeader={
+                    isNewThread && <Welcome mode={settings.context.mode} />
+                  }
+                  disabled={env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true"}
+                  onContextChange={(context) => setSettings("context", context)}
+                  onSubmit={handleSubmit}
+                  onStop={handleStop}
+                />
                 {env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true" && (
                   <div className="text-muted-foreground/67 w-full translate-y-12 text-center text-xs">
                     {t.common.notAvailableInDemoMode}

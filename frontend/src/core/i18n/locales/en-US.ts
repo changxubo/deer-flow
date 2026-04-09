@@ -19,6 +19,7 @@ export const enUS: Translations = {
 
   // Common
   common: {
+    site: "Deep Agent",
     home: "Home",
     settings: "Settings",
     delete: "Delete",
@@ -66,6 +67,47 @@ export const enUS: Translations = {
     createYourOwnSkill: "Create Your Own Skill",
     createYourOwnSkillDescription:
       "Create your own skill to release the power of DeerFlow. With customized skills,\nDeerFlow can help you search on the web, analyze data, and generate\n artifacts like slides, web pages and do almost anything.",
+    welcomeMessages: [
+      "Welcome back 😊",
+      "Hi, I'm here",
+      "All set!",
+      "Great to see you",
+      "Ready to begin?",
+      "Let me help with today’s tasks",
+      "Keep moving forward!",
+      "Let’s do this 💪",
+      "Let’s get to work 🏃‍♂️",
+      "Productivity at max~",
+      "At your service!",
+      "Thanks for waiting ☕",
+      "Let’s get started ✅",
+      "Got new questions?",
+      "You’ve worked hard today!",
+      "Loading inspiration",
+      "Fully charged ⚡",
+      "Let’s go! 🚀",
+      "My thoughts are in sync.",
+      "Inspiration incoming",
+      "Just waiting for your call",
+      "Back to high-efficiency mode!",
+      "Standing by",
+      "Ready for the challenge",
+      "New ideas are forming",
+      "The path is clear—let’s go!",
+      "System online, ready to help 💡",
+      "Loading good vibes",
+      "Take control, starting now 🎵",
+      "Boosting efficiency …",
+      "Today’s goals, on track 🎯",
+      "Let your ideas shine ✨",
+      "Task update complete",
+      "Everything’s ready",
+      "Acceleration mode: ON",
+      "Alright! Let’s begin 😎",
+      "I’m here waiting for you",
+      "Keep up the good work!",
+      "Don’t forget to take a break~ 💤"
+    ],
   },
 
   // Clipboard
@@ -326,6 +368,7 @@ export const enUS: Translations = {
       skills: "Skills",
       notification: "Notification",
       about: "About",
+      language: "Language",
     },
     memory: {
       title: "Memory",

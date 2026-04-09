@@ -8,6 +8,7 @@ export interface Translations {
 
   // Common
   common: {
+    site: string;
     home: string;
     settings: string;
     delete: string;
@@ -51,6 +52,7 @@ export interface Translations {
     description: string;
     createYourOwnSkill: string;
     createYourOwnSkillDescription: string;
+    welcomeMessages: string[];
   };
 
   // Clipboard
@@ -256,6 +258,7 @@ export interface Translations {
       skills: string;
       notification: string;
       about: string;
+      language: string;
     };
     memory: {
       title: string;

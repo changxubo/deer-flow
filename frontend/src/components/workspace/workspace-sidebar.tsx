@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import {
   Sidebar,
   SidebarHeader,
@@ -8,28 +10,35 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
-
 import { RecentChatList } from "./recent-chat-list";
+import { UserProfile } from "./user-profile";
 import { WorkspaceHeader } from "./workspace-header";
 import { WorkspaceNavChatList } from "./workspace-nav-chat-list";
-import { WorkspaceNavMenu } from "./workspace-nav-menu";
+import { WorkspaceNavSettingsOptions } from "./workspace-nav-settings-options";
 
 export function WorkspaceSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
   const { open: isSidebarOpen } = useSidebar();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
     <>
       <Sidebar variant="sidebar" collapsible="icon" {...props}>
         <SidebarHeader className="py-0">
           <WorkspaceHeader />
+          <WorkspaceNavSettingsOptions />
+          <WorkspaceNavChatList />
         </SidebarHeader>
         <SidebarContent>
-          <WorkspaceNavChatList />
-          {isSidebarOpen && <RecentChatList />}
+          {mounted && isSidebarOpen && <RecentChatList />}
         </SidebarContent>
         <SidebarFooter>
-          <WorkspaceNavMenu />
+          <UserProfile />
         </SidebarFooter>
         <SidebarRail />
       </Sidebar>
