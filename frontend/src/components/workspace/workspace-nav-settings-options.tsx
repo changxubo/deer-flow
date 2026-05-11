@@ -54,7 +54,7 @@ export function WorkspaceNavSettingsOptions() {
                 <SidebarMenuButton isActive={pathname === href} asChild >
                   {isSidebarOpen ? (
                     <div className="flex w-full items-center gap-2 text-left text-sm">
-                      <Icon className={cn( "size-4", active ? "" : "text-muted-foreground" )} />
+                      <Icon className={cn( "size-5", active ? "" : "text-muted-foreground" )} />
                       <span 
                       className={cn(active ? "" : "text-muted-foreground")}
                       >
@@ -65,7 +65,7 @@ export function WorkspaceNavSettingsOptions() {
                     <div className="flex size-full items-center justify-center">
                       <Icon
                         className={cn(
-                          "size-4",
+                          "size-5",
                           active ? "" : "text-muted-foreground"
                         )}
                       />

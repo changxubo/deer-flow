@@ -1,6 +1,6 @@
 "use client";
 
-import { BotMessageSquare  , MessageSquarePlus } from "lucide-react";
+import { CirclePlay  , MessageSquarePlus } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -14,6 +14,7 @@ import {
 import { useI18n } from "@/core/i18n/hooks";
 import { env } from "@/env";
 import { cn } from "@/lib/utils";
+import { AgentIcon } from "./agent-icon";
 
 export function WorkspaceHeader({ className }: { className?: string }) {
   const { t } = useI18n();
@@ -41,20 +42,18 @@ export function WorkspaceHeader({ className }: { className?: string }) {
                 href="/"
                 className="text-primary ml-2 flex items-center gap-2 "
               >
-                <BotMessageSquare  size={20} className="hidden"/>
-                <img src="/deep-agent.png" alt="Logo" className="h-12 w-auto rotate-45 hidden sm:block" />
-                <span className="text-md font-normal uppercase">{t.common.site}</span>
+               <AgentIcon className="h-5 w-5 flex-shrink-0 [&_path]:stroke-[1.5px]"/>
+                <span className="text-md font-normal">{t.common.site}</span>
                 <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                  V2.0
+                  2026.5.9
                 </span>
               </Link>
             ) : (
               <div className="text-primary ml-2 flex cursor-default items-center gap-2 ">
-                <BotMessageSquare  size={20} className="hidden"/>
-                <img src="/deep-agent.png" alt="Logo" className="h-12 w-auto rotate-45 hidden sm:block" />
-                <span className="text-md font-normal uppercase">{t.common.site}</span>
+                <AgentIcon className="h-5 w-5 flex-shrink-0 [&_path]:stroke-[1.5px]"/>
+                <span className="text-md font-normal">{t.common.site}</span>
                 <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                  V2.0
+                  2026.5.9
                   </span>
               </div>
             )}

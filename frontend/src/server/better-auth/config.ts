@@ -1,16 +1,17 @@
+import { DatabaseSync } from "node:sqlite";
 import { betterAuth } from "better-auth";
-import { Pool } from "pg";
+import { getMigrations } from "better-auth/db";
 
 import { env } from "@/env";
 
-const pool = new Pool({
-  connectionString: env.DATABASE_URL,
-});
+const database = new DatabaseSync(
+  env.BETTER_AUTH_DATABASE_PATH ?? "./better-auth.db",
+);
 
-export const auth = betterAuth({
+const authOptions = {
   baseURL: env.BETTER_AUTH_URL ?? "http://localhost:3000",
   secret: env.BETTER_AUTH_SECRET ?? "a-default-secret-for-dev-only",
-  database: pool,
+  database,
   session: {
     cookieCache: {
       enabled: true,
@@ -34,6 +35,21 @@ export const auth = betterAuth({
       ),
     },
   },
-});
+};
+
+export const auth = betterAuth(authOptions);
+
+let schemaBootstrapPromise: Promise<void> | null = null;
+
+export async function ensureAuthSchema() {
+  if (!schemaBootstrapPromise) {
+    schemaBootstrapPromise = (async () => {
+      const { runMigrations } = await getMigrations(authOptions);
+      await runMigrations();
+    })();
+  }
+
+  return schemaBootstrapPromise;
+}
 
 export type Session = typeof auth.$Infer.Session;
